@@ -378,6 +378,142 @@ def run_sql(sql: str, limit: int = 100) -> dict[str, Any]:
     return _query(cleaned, limit=min(limit, MAX_ROWS))
 
 
+# -------------------------------------------------------------------------- fantasy
+
+
+@mcp.tool()
+def get_draft_board(
+    season: str = "E2025",
+    teams: int = 8,
+    roster_size: int = 13,
+    position: str | None = None,
+    min_games: int = 5,
+    limit: int = 40,
+) -> dict[str, Any]:
+    """Rank players for a BasketNews Fantasy DRAFT by value over replacement.
+
+    Use this for "who should I pick", "best available guard", or any draft ordering
+    question. Do NOT rank by points per game for a draft: every manager gets a unique
+    roster, so what matters is how much better a player is than the next player at the
+    SAME position who will still be available. That is `vorp_per_game`, and it is the
+    correct sort order.
+
+    Scoring is the BasketNews modern system, recomputed exactly from boxscores.
+
+    Fields worth reasoning about:
+      vorp_per_game     - value over replacement. The draft ranking.
+      modern_per_game   - raw fantasy average.
+      modern_floor_p25  - bad-night floor. Matters more in a draft than in a budget
+                          league, because you keep the pick all season.
+      consistency_ratio - mean divided by standard deviation. Higher is steadier.
+      replacement_level - what is still gettable at this position late in the draft.
+
+    Args:
+        season: season code, e.g. "E2025".
+        teams: managers in the league, 3-12. This changes replacement level and therefore
+            the ranking, so ask the user if it is unknown. BasketNews recommends 7-8.
+        roster_size: players per roster. BasketNews draft mode is 13.
+        position: optional filter, "Guard", "Forward" or "Center".
+        min_games: exclude players below this many appearances.
+        limit: rows to return.
+    """
+    from .fantasy import draft_board_select
+
+    if not 3 <= teams <= 12:
+        return {"error": "BasketNews draft leagues have between 3 and 12 teams"}
+
+    inner = draft_board_select(teams, roster_size)
+    sql = f"""
+        SELECT overall_rank, pos_rank, player_name, position, team_code, games_played,
+               minutes_per_game, modern_per_game, modern_floor_p25, modern_ceiling_p75,
+               consistency_ratio, double_doubles, replacement_level, vorp_per_game,
+               vorp_total, classic_per_game
+        FROM ({inner}) board
+        WHERE season_code = ? AND games_played >= ?
+    """
+    params: list[Any] = [season, min_games]
+    if position:
+        sql += " AND lower(position) = lower(?)"
+        params.append(position)
+    sql += " ORDER BY vorp_per_game DESC LIMIT ?"
+    params.append(min(limit, MAX_ROWS))
+
+    result = _query(sql, params)
+    result["scoring_system"] = "BasketNews modern (draft mode)"
+    result["league"] = {"teams": teams, "roster_size": roster_size}
+    return result
+
+
+@mcp.tool()
+def get_player_fantasy_log(
+    person_code: str,
+    season: str = "E2025",
+    last_n: int = 0,
+) -> dict[str, Any]:
+    """Game-by-game fantasy points for one player, for judging form and reliability.
+
+    A season average hides the thing that decides drafts: whether a player's role changed.
+    Someone averaging 20 who went 8, 9, 10, then 35, 38, 40 is a different asset from
+    someone who scored 20 every night. Read the sequence, not only the mean.
+
+    Args:
+        person_code: canonical id from search_players.
+        season: season code, e.g. "E2025".
+        last_n: return only the most recent N games. 0 returns the whole season.
+    """
+    sql = """
+        SELECT round, utc_date, team_code, minutes, points, rebounds_total,
+               assists, steals, turnovers, missed_fg, pir, team_won,
+               fantasy_modern, fantasy_classic
+        FROM fantasy_points_game
+        WHERE person_code = ? AND season_code = ? AND minutes > 0
+        ORDER BY utc_date DESC
+    """
+    params: list[Any] = [person_code, season]
+    if last_n > 0:
+        sql += " LIMIT ?"
+        params.append(min(last_n, MAX_ROWS))
+    return _query(sql, params)
+
+
+@mcp.tool()
+def compare_draft_candidates(
+    person_codes: list[str],
+    season: str = "E2025",
+    teams: int = 8,
+) -> dict[str, Any]:
+    """Compare named players side by side for a draft pick decision.
+
+    Use when the user is choosing between specific players ("Vezenkov or Milutinov?").
+    Resolve names to person_codes with search_players first.
+
+    Args:
+        person_codes: two or more canonical ids.
+        season: season code, e.g. "E2025".
+        teams: managers in the league, used to set replacement level.
+    """
+    from .fantasy import draft_board_select
+
+    if len(person_codes) < 2:
+        return {"error": "give at least two person_codes to compare"}
+
+    inner = draft_board_select(teams, 13)
+    placeholders = ", ".join("?" for _ in person_codes)
+    sql = f"""
+        WITH board AS ({inner})
+        SELECT f.person_code, b.player_name, b.position, b.team_code, b.games_played,
+               b.minutes_per_game, b.modern_per_game, b.modern_floor_p25,
+               b.modern_ceiling_p75, b.consistency_ratio, b.vorp_per_game,
+               b.pos_rank, b.overall_rank
+        FROM board b
+        JOIN fantasy_player_season f
+          ON f.person_code = b.person_code AND f.season_code = b.season_code
+        WHERE f.person_code IN ({placeholders}) AND b.season_code = ?
+        ORDER BY b.vorp_per_game DESC
+    """
+    return _query(sql, [*person_codes, season])
+
+
 # ------------------------------------------------------------------------ resources
 
 

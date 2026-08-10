@@ -1,0 +1,157 @@
+{
+  "generated_at": "2026-08-10T10:46:16+00:00",
+  "database": "data/euroleague.duckdb",
+  "row_counts": {
+    "boxscores_player": 360,
+    "boxscores_team": 30,
+    "games": 402,
+    "players": 244,
+    "play_by_play": 7726,
+    "seasons": 27,
+    "shots": 2200,
+    "teams": 20
+  },
+  "checks": [
+    {
+      "name": "team_total_vs_final_score",
+      "description": "boxscores_team.points equals games.home_score/away_score",
+      "severity": "error",
+      "passed": true,
+      "checked": 30,
+      "violations": 0,
+      "examples": []
+    },
+    {
+      "name": "player_sum_vs_team_total",
+      "description": "sum(boxscores_player.points) equals boxscores_team.points",
+      "severity": "error",
+      "passed": true,
+      "checked": 30,
+      "violations": 0,
+      "examples": []
+    },
+    {
+      "name": "pbp_points_vs_boxscore",
+      "description": "points implied by play-by-play scoring events equal the boxscore total",
+      "severity": "error",
+      "passed": true,
+      "checked": 14,
+      "violations": 0,
+      "examples": []
+    },
+    {
+      "name": "shots_vs_boxscore_fga",
+      "description": "shot rows per team equal boxscore field goals attempted",
+      "severity": "warning",
+      "passed": true,
+      "checked": 14,
+      "violations": 0,
+      "examples": []
+    },
+    {
+      "name": "pbp_period_ranges_disjoint",
+      "description": "play_number ranges of consecutive periods do not overlap",
+      "severity": "warning",
+      "passed": false,
+      "checked": 14,
+      "violations": 6,
+      "examples": [
+        [
+          6,
+          2,
+          253,
+          157
+        ],
+        [
+          2,
+          4,
+          688,
+          514
+        ],
+        [
+          7,
+          4,
+          436,
+          403
+        ],
+        [
+          10,
+          4,
+          584,
+          490
+        ],
+        [
+          5,
+          2,
+          155,
+          126
+        ]
+      ]
+    },
+    {
+      "name": "pbp_play_number_unique",
+      "description": "play_number is unique within a game",
+      "severity": "warning",
+      "passed": true,
+      "checked": 7726,
+      "violations": 0,
+      "examples": []
+    },
+    {
+      "name": "person_crosswalk_resolves",
+      "description": "shots and play-by-play person codes resolve to the players table",
+      "severity": "warning",
+      "passed": false,
+      "checked": 2200,
+      "violations": 1,
+      "examples": [
+        [
+          "AC_A",
+          null
+        ]
+      ]
+    },
+    {
+      "name": "played_games_have_detail",
+      "description": "every played game has boxscore, shot and play-by-play rows",
+      "severity": "warning",
+      "passed": false,
+      "checked": 402,
+      "violations": 388,
+      "examples": [
+        [
+          406,
+          0,
+          0,
+          0
+        ],
+        [
+          405,
+          0,
+          0,
+          0
+        ],
+        [
+          404,
+          0,
+          0,
+          0
+        ],
+        [
+          403,
+          0,
+          0,
+          0
+        ],
+        [
+          399,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  ],
+  "blocking_failures": 0,
+  "status": "PASS"
+}

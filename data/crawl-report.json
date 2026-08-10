@@ -1,0 +1,15 @@
+{
+  "competition": "E",
+  "season": "E2025",
+  "games_in_schedule": 402,
+  "games_crawled": 2,
+  "games_skipped_unplayed": 0,
+  "elapsed_seconds": 54.2,
+  "fetch": {
+    "requests": 10,
+    "cache_hits": 0,
+    "rate_limit_hits": 0,
+    "sleep_seconds": 50.7,
+    "errors": {}
+  }
+}

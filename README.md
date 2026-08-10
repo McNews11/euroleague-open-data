@@ -95,6 +95,35 @@ Which games are unreliable for lineup analysis?
 That last one matters. The warehouse tracks its own completeness, so the model can say
 "this game has no shot data" instead of inventing a number.
 
+## Fantasy drafting
+
+Built for [BasketNews Fantasy](https://fantasy.basketnews.com/lt/rules) **draft mode**:
+private leagues of 3–12 managers, 13-player rosters, unique squads, snake or reverse-snake
+order.
+
+Fantasy points are **recomputed exactly from boxscores**, not estimated. Every term in the
+modern scoring system maps onto a stored field, so a player's score here is the score the
+game would award.
+
+Ranking is by **value over replacement**, not by average. In a draft each manager gets a
+unique roster, so what decides a pick is how much better a player is than the next one
+available at the same position — and that depends on league size. An 8-team league and a
+12-team league produce different boards from the same data.
+
+```
+uv run python -m euroleague_open_data.fantasy --teams 8 --scoring classic
+```
+
+Two things about scoring are worth knowing before you trust a late-round pick:
+
+1. **The "classic" formula is not published for draft mode.** The rules page describes it
+   only as "traditional scoring based on player statistics". Budget mode gives an explicit
+   formula — PIR ±10% by team result — and that is what `classic` implements here. It is an
+   assumption, and it is marked as one in `fantasy.py`.
+2. **It matters less than it looks.** Rank correlation between classic and modern is 0.99
+   and seven of the top eight are the same players. The disagreement shows up in the
+   middle: one player moves 94th to 61st, which in an 8×13 draft is a different round.
+
 ## Tools
 
 | Tool | Purpose |
@@ -106,6 +135,12 @@ That last one matters. The warehouse tracks its own completeness, so the model c
 | `get_game_boxscore` | full game detail with completeness flags |
 | `get_shot_chart` | zone aggregates, optionally raw x/y coordinates |
 | `run_sql` | read-only DuckDB SELECT — the escape hatch for unanticipated questions |
+| `get_draft_board` | draft ranking by value over replacement, sized to your league |
+| `plan_snake_draft` | your picks in snake order, and who should survive until each |
+| `compare_draft_candidates` | head to head for a specific pick decision |
+| `get_player_fantasy_log` | game-by-game fantasy points, for form and role changes |
+| `get_coach_rotation` | how deep a coach's rotation runs — the ceiling on minutes |
+| `get_role_outlook` | minutes and production a club vacated, by position |
 
 Resources: `euroleague://schema`, `euroleague://coverage`, `euroleague://data-quality`.
 

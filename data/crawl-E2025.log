@@ -1211,3 +1211,10 @@
 15:02:52 INFO    HTTP Request: GET https://live.euroleague.net/api/PlayByPlay?gamecode=403&seasoncode=E2025 "HTTP/1.1 200 OK"
 15:02:57 INFO    HTTP Request: GET https://live.euroleague.net/api/Points?gamecode=403&seasoncode=E2025 "HTTP/1.1 200 OK"
 15:03:01 INFO    HTTP Request: GET https://api-live.euroleague.net/v2/competitions/E/seasons/E2025/games/404/stats "HTTP/1.1 200 OK"
+15:03:04 INFO    HTTP Request: GET https://live.euroleague.net/api/PlayByPlay?gamecode=404&seasoncode=E2025 "HTTP/1.1 200 OK"
+15:03:08 INFO    HTTP Request: GET https://live.euroleague.net/api/Points?gamecode=404&seasoncode=E2025 "HTTP/1.1 200 OK"
+15:03:08 INFO    E2025 400/402 games | 1194 requests, 10 cached, 0 rate-limits, 4506.6s slept
+15:03:13 INFO    HTTP Request: GET https://api-live.euroleague.net/v2/competitions/E/seasons/E2025/games/405/stats "HTTP/1.1 200 OK"
+15:03:17 INFO    HTTP Request: GET https://live.euroleague.net/api/PlayByPlay?gamecode=405&seasoncode=E2025 "HTTP/1.1 200 OK"
+15:03:20 INFO    HTTP Request: GET https://live.euroleague.net/api/Points?gamecode=405&seasoncode=E2025 "HTTP/1.1 200 OK"
+15:03:25 INFO    HTTP Request: GET https://api-live.euroleague.net/v2/competitions/E/seasons/E2025/games/406/stats "HTTP/1.1 200 OK"

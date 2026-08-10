@@ -389,6 +389,7 @@ def get_draft_board(
     position: str | None = None,
     min_games: int = 5,
     limit: int = 40,
+    scoring: str = "classic",
 ) -> dict[str, Any]:
     """Rank players for a BasketNews Fantasy DRAFT by value over replacement.
 
@@ -422,7 +423,7 @@ def get_draft_board(
     if not 3 <= teams <= 12:
         return {"error": "BasketNews draft leagues have between 3 and 12 teams"}
 
-    inner = draft_board_select(teams, roster_size)
+    inner = draft_board_select(teams, roster_size, scoring)
     sql = f"""
         SELECT overall_rank, pos_rank, player_name, position, team_code, games_played,
                minutes_per_game, modern_per_game, modern_floor_p25, modern_ceiling_p75,
@@ -439,7 +440,7 @@ def get_draft_board(
     params.append(min(limit, MAX_ROWS))
 
     result = _query(sql, params)
-    result["scoring_system"] = "BasketNews modern (draft mode)"
+    result["scoring_system"] = f"BasketNews {scoring} (draft mode)"
     result["league"] = {"teams": teams, "roster_size": roster_size}
     return result
 
@@ -481,6 +482,7 @@ def compare_draft_candidates(
     person_codes: list[str],
     season: str = "E2025",
     teams: int = 8,
+    scoring: str = "classic",
 ) -> dict[str, Any]:
     """Compare named players side by side for a draft pick decision.
 
@@ -497,7 +499,7 @@ def compare_draft_candidates(
     if len(person_codes) < 2:
         return {"error": "give at least two person_codes to compare"}
 
-    inner = draft_board_select(teams, 13)
+    inner = draft_board_select(teams, 13, scoring)
     placeholders = ", ".join("?" for _ in person_codes)
     sql = f"""
         WITH board AS ({inner})
@@ -512,6 +514,89 @@ def compare_draft_candidates(
         ORDER BY b.vorp_per_game DESC
     """
     return _query(sql, [*person_codes, season])
+
+
+@mcp.tool()
+def plan_snake_draft(
+    pick_slot: int,
+    season: str = "E2025",
+    teams: int = 8,
+    rounds: int = 13,
+    reverse_snake: bool = False,
+    scoring: str = "classic",
+) -> dict[str, Any]:
+    """Work out which overall picks you own and who should be there when your turn comes.
+
+    Use this when the user knows their draft slot and wants a plan ("I pick 3rd of 8,
+    what should I target?").
+
+    Snake order: odd rounds run 1..N, even rounds run N..1, so a late slot gets a fast
+    turnaround between picks and an early slot waits. BasketNews also offers a reverse
+    snake, where rounds 1 and 2 are the normal snake and the direction then repeats in
+    pairs; set reverse_snake for that.
+
+    `likely_available` assumes every manager drafts strictly off this board, which nobody
+    does. Treat it as the centre of a distribution, not a prediction. Its real use is
+    spotting where a positional tier runs out between two of your picks -- that is the
+    signal worth acting on.
+
+    Args:
+        pick_slot: your position in round one, 1 to `teams`.
+        season: season code, e.g. "E2025".
+        teams: managers in the league.
+        rounds: roster size. BasketNews draft mode is 13.
+        reverse_snake: use BasketNews reverse-snake order instead of standard snake.
+        scoring: "classic" or "modern". BasketNews leagues choose one; ask the user.
+    """
+    from .fantasy import draft_board_select
+
+    if not 1 <= pick_slot <= teams:
+        return {"error": f"pick_slot must be between 1 and {teams}"}
+    if not 3 <= teams <= 12:
+        return {"error": "BasketNews draft leagues have between 3 and 12 teams"}
+
+    picks: list[dict[str, Any]] = []
+    for rnd in range(1, rounds + 1):
+        # Reverse snake pairs the rounds up: 1 forward, 2 and 3 reverse, 4 and 5
+        # forward, and so on. Standard snake simply alternates.
+        forward = ((rnd + 1) // 2) % 2 == 1 if reverse_snake else rnd % 2 == 1
+        position = pick_slot if forward else teams - pick_slot + 1
+        picks.append(
+            {
+                "round": rnd,
+                "pick_in_round": position,
+                "overall_pick": (rnd - 1) * teams + position,
+            }
+        )
+
+    inner = draft_board_select(teams, rounds, scoring)
+    board = _query(
+        f"""SELECT overall_rank, player_name, position, team_code, games_played,
+                   minutes_per_game, vorp_per_game, modern_floor_p25, consistency_ratio
+            FROM ({inner}) b
+            WHERE season_code = ?
+            ORDER BY vorp_per_game DESC
+            LIMIT ?""",
+        [season, teams * rounds],
+    )
+    ranked = board.get("rows") or []
+
+    for pick in picks:
+        index = pick["overall_pick"] - 1
+        pick["likely_available"] = ranked[index] if index < len(ranked) else None
+
+    return {
+        "your_picks": picks,
+        "gap_between_picks": [
+            picks[i + 1]["overall_pick"] - picks[i]["overall_pick"] for i in range(len(picks) - 1)
+        ],
+        "scoring_system": scoring,
+        "league": {"teams": teams, "rounds": rounds, "reverse_snake": reverse_snake},
+        "note": (
+            "likely_available assumes everyone drafts off this exact board. Use it to see "
+            "where a position thins out between your picks, not as a forecast of who falls."
+        ),
+    }
 
 
 @mcp.tool()

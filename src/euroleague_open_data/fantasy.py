@@ -175,7 +175,7 @@ LEFT JOIN players p USING (person_code)
 """
 
 
-def draft_board_select(teams: int, roster_size: int) -> str:
+def draft_board_select(teams: int, roster_size: int, scoring: str = "classic") -> str:
     """Value over replacement, given the league's shape.
 
     Replacement level is the point where a position runs out of draftable players. With
@@ -187,6 +187,9 @@ def draft_board_select(teams: int, roster_size: int) -> str:
     position after the draft ends. That is what makes a scarce centre worth more than an
     equally productive guard.
     """
+    if scoring not in ("classic", "modern"):
+        raise ValueError("scoring must be 'classic' or 'modern'")
+    metric = f"{scoring}_per_game"
     drafted = teams * roster_size
     return f"""
 WITH pool AS (
@@ -197,19 +200,19 @@ WITH pool AS (
 ),
 position_share AS (
     SELECT pos, count(*) * 1.0 / sum(count(*)) OVER () AS share
-    FROM (SELECT pos FROM pool ORDER BY modern_per_game DESC LIMIT {drafted}) t
+    FROM (SELECT pos FROM pool ORDER BY {metric} DESC LIMIT {drafted}) t
     GROUP BY pos
 ),
 ranked AS (
     SELECT p.*,
-           row_number() OVER (PARTITION BY p.pos ORDER BY p.modern_per_game DESC) AS pos_rank,
-           row_number() OVER (ORDER BY p.modern_per_game DESC) AS overall_rank,
+           row_number() OVER (PARTITION BY p.pos ORDER BY p.{metric} DESC) AS pos_rank,
+           row_number() OVER (ORDER BY p.{metric} DESC) AS overall_rank,
            greatest(1, cast(round({drafted} * s.share) AS INTEGER)) AS pos_slots
     FROM pool p
     LEFT JOIN position_share s ON s.pos = p.pos
 ),
 replacement AS (
-    SELECT pos, min(modern_per_game) AS replacement_level
+    SELECT pos, min({metric}) AS replacement_level
     FROM ranked
     WHERE pos_rank <= pos_slots
     GROUP BY pos
@@ -233,8 +236,9 @@ SELECT
     r.double_doubles,
     r.classic_per_game,
     round(rep.replacement_level, 2) AS replacement_level,
-    round(r.modern_per_game - rep.replacement_level, 2) AS vorp_per_game,
-    round((r.modern_per_game - rep.replacement_level) * r.games_played, 1) AS vorp_total,
+    round(r.{metric} - rep.replacement_level, 2) AS vorp_per_game,
+    round((r.{metric} - rep.replacement_level) * r.games_played, 1) AS vorp_total,
+    '{scoring}' AS scoring_system,
     {teams} AS league_teams,
     {roster_size} AS roster_size
 FROM ranked r
@@ -243,7 +247,9 @@ ORDER BY vorp_per_game DESC
 """
 
 
-def build(db_path: Path, *, teams: int = 8, roster_size: int = 13) -> None:
+def build(
+    db_path: Path, *, teams: int = 8, roster_size: int = 13, scoring: str = "classic"
+) -> None:
     con = duckdb.connect(str(db_path))
     con.execute(FANTASY_GAME_SQL)
     con.execute(FANTASY_SEASON_SQL)
@@ -261,9 +267,10 @@ def main() -> None:
     parser.add_argument("--db", type=Path, default=Path("data/euroleague.duckdb"))
     parser.add_argument("--teams", type=int, default=8, help="managers in the league (3-12)")
     parser.add_argument("--roster-size", type=int, default=13)
+    parser.add_argument("--scoring", default="classic", choices=["classic", "modern"])
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    build(args.db, teams=args.teams, roster_size=args.roster_size)
+    build(args.db, teams=args.teams, roster_size=args.roster_size, scoring=args.scoring)
 
 
 if __name__ == "__main__":

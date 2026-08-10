@@ -1,0 +1,366 @@
+[
+ {
+  "comp": "E",
+  "season": "E2000",
+  "games": 158,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2001",
+  "games": 275,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2002",
+  "games": 220,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2003",
+  "games": 220,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2004",
+  "games": 229,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2005",
+  "games": 231,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2006",
+  "games": 230,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "E",
+  "season": "E2007",
+  "games": 231,
+  "shots_http": 200,
+  "shots": 175
+ },
+ {
+  "comp": "E",
+  "season": "E2008",
+  "games": 188,
+  "shots_http": 200,
+  "shots": 156
+ },
+ {
+  "comp": "E",
+  "season": "E2009",
+  "games": 188,
+  "shots_http": 200,
+  "shots": 143
+ },
+ {
+  "comp": "E",
+  "season": "E2010",
+  "games": 189,
+  "shots_http": 200,
+  "shots": 154
+ },
+ {
+  "comp": "E",
+  "season": "E2011",
+  "games": 188,
+  "shots_http": 200,
+  "shots": 140
+ },
+ {
+  "comp": "E",
+  "season": "E2012",
+  "games": 253,
+  "shots_http": 200,
+  "shots": 161
+ },
+ {
+  "comp": "E",
+  "season": "E2013",
+  "games": 253,
+  "shots_http": 200,
+  "shots": 128
+ },
+ {
+  "comp": "E",
+  "season": "E2014",
+  "games": 251,
+  "shots_http": 200,
+  "shots": 152
+ },
+ {
+  "comp": "E",
+  "season": "E2015",
+  "games": 250,
+  "shots_http": 200,
+  "shots": 153
+ },
+ {
+  "comp": "E",
+  "season": "E2016",
+  "games": 259,
+  "shots_http": 200,
+  "shots": 135
+ },
+ {
+  "comp": "E",
+  "season": "E2017",
+  "games": 260,
+  "shots_http": 200,
+  "shots": 163
+ },
+ {
+  "comp": "E",
+  "season": "E2018",
+  "games": 260,
+  "shots_http": 200,
+  "shots": 144
+ },
+ {
+  "comp": "E",
+  "season": "E2019",
+  "games": 306,
+  "shots_http": 200,
+  "shots": 169
+ },
+ {
+  "comp": "E",
+  "season": "E2020",
+  "games": 328,
+  "shots_http": 200,
+  "shots": 141
+ },
+ {
+  "comp": "E",
+  "season": "E2021",
+  "games": 327,
+  "shots_http": 200,
+  "shots": 149
+ },
+ {
+  "comp": "E",
+  "season": "E2022",
+  "games": 328,
+  "shots_http": 200,
+  "shots": 147
+ },
+ {
+  "comp": "E",
+  "season": "E2023",
+  "games": 331,
+  "shots_http": 200,
+  "shots": 148
+ },
+ {
+  "comp": "E",
+  "season": "E2024",
+  "games": 330,
+  "shots_http": 200,
+  "shots": 150
+ },
+ {
+  "comp": "E",
+  "season": "E2025",
+  "games": 402,
+  "shots_http": 200,
+  "shots": 158
+ },
+ {
+  "comp": "E",
+  "season": "E2026",
+  "games": 380,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2002",
+  "games": 150,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2003",
+  "games": 209,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2004",
+  "games": 239,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2005",
+  "games": 149,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2006",
+  "games": 149,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2007",
+  "games": 326,
+  "shots_http": 200,
+  "shots": 154
+ },
+ {
+  "comp": "U",
+  "season": "U2008",
+  "games": 151,
+  "shots_http": 200,
+  "shots": 162
+ },
+ {
+  "comp": "U",
+  "season": "U2009",
+  "games": 156,
+  "shots_http": 200,
+  "shots": 126
+ },
+ {
+  "comp": "U",
+  "season": "U2010",
+  "games": 156,
+  "shots_http": 200,
+  "shots": 147
+ },
+ {
+  "comp": "U",
+  "season": "U2011",
+  "games": 156,
+  "shots_http": 200,
+  "shots": 162
+ },
+ {
+  "comp": "U",
+  "season": "U2012",
+  "games": 157,
+  "shots_http": 200,
+  "shots": 147
+ },
+ {
+  "comp": "U",
+  "season": "U2013",
+  "games": 366,
+  "shots_http": 200,
+  "shots": 0
+ },
+ {
+  "comp": "U",
+  "season": "U2014",
+  "games": 306,
+  "shots_http": 200,
+  "shots": 149
+ },
+ {
+  "comp": "U",
+  "season": "U2015",
+  "games": 306,
+  "shots_http": 200,
+  "shots": 137
+ },
+ {
+  "comp": "U",
+  "season": "U2016",
+  "games": 146,
+  "shots_http": 200,
+  "shots": null
+ },
+ {
+  "comp": "U",
+  "season": "U2017",
+  "games": 184,
+  "shots_http": 200,
+  "shots": 157
+ },
+ {
+  "comp": "U",
+  "season": "U2018",
+  "games": 186,
+  "shots_http": 200,
+  "shots": 156
+ },
+ {
+  "comp": "U",
+  "season": "U2019",
+  "games": 180,
+  "shots_http": 200,
+  "shots": 150
+ },
+ {
+  "comp": "U",
+  "season": "U2020",
+  "games": 185,
+  "shots_http": 200,
+  "shots": 151
+ },
+ {
+  "comp": "U",
+  "season": "U2021",
+  "games": 195,
+  "shots_http": 200,
+  "shots": 135
+ },
+ {
+  "comp": "U",
+  "season": "U2022",
+  "games": 195,
+  "shots_http": 200,
+  "shots": 149
+ },
+ {
+  "comp": "U",
+  "season": "U2023",
+  "games": 195,
+  "shots_http": 200,
+  "shots": 163
+ },
+ {
+  "comp": "U",
+  "season": "U2024",
+  "games": 196,
+  "shots_http": 200,
+  "shots": 188
+ },
+ {
+  "comp": "U",
+  "season": "U2025",
+  "games": 195,
+  "shots_http": 200,
+  "shots": 176
+ },
+ {
+  "comp": "U",
+  "season": "U2026",
+  "games": 224,
+  "shots_http": 200,
+  "shots": null
+ }
+]

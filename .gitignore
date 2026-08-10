@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+data/cache/
+data/*.duckdb
+data/exports/

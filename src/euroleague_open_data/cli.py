@@ -52,8 +52,15 @@ def export(db_path: Path, out_dir: Path) -> list[Path]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="euroleague-etl", description="EuroLeague ETL pipeline.")
-    parser.add_argument("--competition", default="E", choices=["E", "U"])
-    parser.add_argument("--season", default="E2025")
+    parser.add_argument(
+        "--competition",
+        default=None,
+        choices=["E", "U"],
+        help="crawl/build one competition; omit to build every cached season",
+    )
+    parser.add_argument(
+        "--season", default=None, help="crawl/build one season; omit to build every cached season"
+    )
     parser.add_argument("--cache-dir", type=Path, default=Path("data/cache"))
     parser.add_argument("--db", type=Path, default=Path("data/euroleague.duckdb"))
     parser.add_argument("--exports", type=Path, default=Path("data/exports"))
@@ -62,6 +69,7 @@ def main() -> None:
         "--teams", type=int, default=8, help="fantasy league size, sets draft replacement level"
     )
     parser.add_argument("--roster-size", type=int, default=13)
+    parser.add_argument("--scoring", default="classic", choices=["classic", "modern"])
     parser.add_argument(
         "--skip-crawl",
         action="store_true",
@@ -74,13 +82,16 @@ def main() -> None:
     )
 
     if not args.skip_crawl:
+        if not (args.competition and args.season):
+            raise SystemExit("--competition and --season are required unless --skip-crawl")
         report = crawl_season(args.competition, args.season, args.cache_dir)
         log.info("crawl: %s", json.dumps(report))
 
     # Order matters: each stage reads tables the previous one created.
     warehouse.build(args.cache_dir, args.db, args.competition, args.season)
+
     analytics.build(args.db)
-    fantasy.build(args.db, teams=args.teams, roster_size=args.roster_size)
+    fantasy.build(args.db, teams=args.teams, roster_size=args.roster_size, scoring=args.scoring)
     roles.build(args.db)
 
     quality = validate.run_all(args.db)

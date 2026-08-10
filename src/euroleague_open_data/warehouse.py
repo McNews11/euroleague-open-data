@@ -424,9 +424,72 @@ def extract(cache: RawCache, comp: str, season: str) -> Extraction:
     return ex
 
 
-def build(cache_dir: Path, db_path: Path, comp: str, season: str) -> Path:
+def discover_seasons(cache_dir: Path) -> list[tuple[str, str]]:
+    """Every (competition, season) pair the cache holds a game list for.
+
+    Derived from what was actually crawled rather than from a configured list, so adding a
+    season means crawling it -- there is no second place to remember to update.
+    """
+    found: set[tuple[str, str]] = set()
+    for path in cache_dir.glob("*.json"):
+        try:
+            url = json.loads(path.read_text())["url"]
+        except (json.JSONDecodeError, KeyError):
+            continue
+        if "/competitions/" in url and "/games?limit" in url:
+            comp = url.split("/competitions/")[1].split("/")[0]
+            season = url.split("/seasons/")[1].split("/")[0]
+            found.add((comp, season))
+    return sorted(found)
+
+
+def build(
+    cache_dir: Path,
+    db_path: Path,
+    comp: str | None = None,
+    season: str | None = None,
+) -> Path:
+    """Build the warehouse from the cache.
+
+    With `comp`/`season` given, builds that one season. With both omitted, builds every
+    season present in the cache -- which is what multi-season analysis needs, because
+    transfers and vacated roles are defined by comparing consecutive seasons and are
+    invisible inside any single one.
+    """
     cache = RawCache(cache_dir)
-    ex = extract(cache, comp, season)
+
+    if comp and season:
+        targets = [(comp, season)]
+    else:
+        targets = discover_seasons(cache_dir)
+        if not targets:
+            raise ValueError(f"no crawled seasons found in {cache_dir}")
+    log.info("building %d season(s): %s", len(targets), ", ".join(s for _, s in targets))
+
+    merged = Extraction([], [], [], [], [], [], [], [], [], [])
+    seen_players: set[str] = set()
+    for target_comp, target_season in targets:
+        part = extract(cache, target_comp, target_season)
+        merged.seasons.extend(part.seasons)
+        merged.teams.extend(part.teams)
+        merged.games.extend(part.games)
+        merged.boxscores_player.extend(part.boxscores_player)
+        merged.boxscores_team.extend(part.boxscores_team)
+        merged.shots.extend(part.shots)
+        merged.play_by_play.extend(part.play_by_play)
+        merged.coaches.extend(part.coaches)
+        merged.player_team_spells.extend(part.player_team_spells)
+        # `players` is a dimension, not a fact: one row per person across all seasons.
+        # Later seasons win, so height and position reflect the most recent record.
+        for row in part.players:
+            code = row["person_code"]
+            if code not in seen_players:
+                seen_players.add(code)
+                merged.players.append(row)
+
+    ex = merged
+    # `seasons` comes from the competition-wide list, so it repeats once per build target.
+    ex.seasons = list({s["season_code"]: s for s in ex.seasons}.values())
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     db_path.unlink(missing_ok=True)

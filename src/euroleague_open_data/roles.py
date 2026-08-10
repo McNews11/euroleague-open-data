@@ -181,6 +181,14 @@ current_roster AS (
     UNION
     SELECT DISTINCT season_code, team_code, person_code FROM boxscores_player
 ),
+-- Only seasons whose rosters were actually loaded can be compared against. Without this
+-- guard, the season after the last loaded one has an empty roster, so every player in
+-- the warehouse reads as having "departed" -- an absence of data reported as a fact
+-- about the world. Measured: with only E2025 loaded it claimed 340 departures from
+-- E2026.
+seasons_with_roster AS (
+    SELECT DISTINCT season_code FROM current_roster
+),
 departures AS (
     SELECT
         so.season_code                    AS season_code,
@@ -191,6 +199,7 @@ departures AS (
         p.fantasy_per_game,
         p.games_played
     FROM season_order so
+    JOIN seasons_with_roster swr ON swr.season_code = so.season_code
     JOIN prior_production p ON p.season_code = so.prev_season
     LEFT JOIN current_roster c
       ON c.season_code = so.season_code

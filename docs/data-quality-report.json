@@ -1,15 +1,27 @@
 {
-  "generated_at": "2026-08-10T10:46:16+00:00",
+  "generated_at": "2026-08-10T13:03:33+00:00",
   "database": "data/euroleague.duckdb",
   "row_counts": {
-    "boxscores_player": 360,
-    "boxscores_team": 30,
-    "games": 402,
-    "players": 244,
-    "play_by_play": 7726,
+    "boxscores_player": 16101,
+    "boxscores_team": 1354,
+    "coaches": 1354,
+    "coach_rotation_profile": 60,
+    "draft_board": 568,
+    "fantasy_player_season": 629,
+    "fantasy_points_game": 16101,
+    "games": 732,
+    "game_completeness": 732,
+    "players": 459,
+    "player_role_stability": 667,
+    "player_season_stats": 654,
+    "player_team_spells": 709,
+    "play_by_play": 369795,
     "seasons": 27,
-    "shots": 2200,
-    "teams": 20
+    "shots": 106745,
+    "shot_zones": 4710,
+    "teams": 38,
+    "team_season_stats": 38,
+    "vacated_role": 52
   },
   "checks": [
     {
@@ -17,7 +29,7 @@
       "description": "boxscores_team.points equals games.home_score/away_score",
       "severity": "error",
       "passed": true,
-      "checked": 30,
+      "checked": 1354,
       "violations": 0,
       "examples": []
     },
@@ -26,7 +38,7 @@
       "description": "sum(boxscores_player.points) equals boxscores_team.points",
       "severity": "error",
       "passed": true,
-      "checked": 30,
+      "checked": 1354,
       "violations": 0,
       "examples": []
     },
@@ -35,7 +47,7 @@
       "description": "points implied by play-by-play scoring events equal the boxscore total",
       "severity": "error",
       "passed": true,
-      "checked": 14,
+      "checked": 677,
       "violations": 0,
       "examples": []
     },
@@ -43,48 +55,61 @@
       "name": "shots_vs_boxscore_fga",
       "description": "shot rows per team equal boxscore field goals attempted",
       "severity": "warning",
-      "passed": true,
-      "checked": 14,
-      "violations": 0,
-      "examples": []
+      "passed": false,
+      "checked": 677,
+      "violations": 1,
+      "examples": [
+        [
+          "E2025",
+          71,
+          "MIL",
+          67,
+          68.0
+        ]
+      ]
     },
     {
       "name": "pbp_period_ranges_disjoint",
       "description": "play_number ranges of consecutive periods do not overlap",
       "severity": "warning",
       "passed": false,
-      "checked": 14,
-      "violations": 6,
+      "checked": 677,
+      "violations": 244,
       "examples": [
         [
-          6,
+          "E2024",
+          1,
           2,
-          253,
-          157
+          550,
+          176
         ],
         [
+          "E2024",
+          1,
+          3,
+          551,
+          295
+        ],
+        [
+          "E2024",
+          1,
+          4,
+          469,
+          433
+        ],
+        [
+          "E2024",
+          78,
           2,
-          4,
-          688,
-          514
-        ],
-        [
-          7,
-          4,
-          436,
-          403
-        ],
-        [
-          10,
-          4,
-          584,
-          490
-        ],
-        [
-          5,
-          2,
-          155,
+          276,
           126
+        ],
+        [
+          "E2024",
+          221,
+          3,
+          379,
+          264
         ]
       ]
     },
@@ -93,7 +118,7 @@
       "description": "play_number is unique within a game",
       "severity": "warning",
       "passed": true,
-      "checked": 7726,
+      "checked": 369795,
       "violations": 0,
       "examples": []
     },
@@ -102,9 +127,13 @@
       "description": "shots and play-by-play person codes resolve to the players table",
       "severity": "warning",
       "passed": false,
-      "checked": 2200,
-      "violations": 1,
+      "checked": 106745,
+      "violations": 2,
       "examples": [
+        [
+          "AC_B",
+          null
+        ],
         [
           "AC_A",
           null
@@ -115,41 +144,10 @@
       "name": "played_games_have_detail",
       "description": "every played game has boxscore, shot and play-by-play rows",
       "severity": "warning",
-      "passed": false,
-      "checked": 402,
-      "violations": 388,
-      "examples": [
-        [
-          406,
-          0,
-          0,
-          0
-        ],
-        [
-          405,
-          0,
-          0,
-          0
-        ],
-        [
-          404,
-          0,
-          0,
-          0
-        ],
-        [
-          403,
-          0,
-          0,
-          0
-        ],
-        [
-          399,
-          0,
-          0,
-          0
-        ]
-      ]
+      "passed": true,
+      "checked": 732,
+      "violations": 0,
+      "examples": []
     }
   ],
   "blocking_failures": 0,

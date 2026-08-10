@@ -1218,3 +1218,6 @@
 15:03:17 INFO    HTTP Request: GET https://live.euroleague.net/api/PlayByPlay?gamecode=405&seasoncode=E2025 "HTTP/1.1 200 OK"
 15:03:20 INFO    HTTP Request: GET https://live.euroleague.net/api/Points?gamecode=405&seasoncode=E2025 "HTTP/1.1 200 OK"
 15:03:25 INFO    HTTP Request: GET https://api-live.euroleague.net/v2/competitions/E/seasons/E2025/games/406/stats "HTTP/1.1 200 OK"
+15:03:29 INFO    HTTP Request: GET https://live.euroleague.net/api/PlayByPlay?gamecode=406&seasoncode=E2025 "HTTP/1.1 200 OK"
+15:03:32 INFO    HTTP Request: GET https://live.euroleague.net/api/Points?gamecode=406&seasoncode=E2025 "HTTP/1.1 200 OK"
+15:03:32 INFO    done: {"competition": "E", "season": "E2025", "games_in_schedule": 402, "games_crawled": 402, "games_skipped_unplayed": 0, "elapsed_seconds": 4986.2, "fetch": {"requests": 1200, "cache_hits": 10, "rate_limit_hits": 0, "sleep_seconds": 4529.1, "errors": {}}}

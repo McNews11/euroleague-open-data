@@ -102,3 +102,22 @@ def test_single_loaded_season_produces_empty_table(db):
     con.close()
 
     assert _vacated(path) == []
+
+
+def test_club_that_left_the_competition_is_excluded(db):
+    """A club that drops out of the competition vacates its whole roster, which is true
+    and useless -- nobody is joining it. Measured E2024 -> E2025: ALBA Berlin left and
+    contributed 340 phantom vacated minutes."""
+    path, con = db
+    con.execute("""
+        INSERT INTO player_role_stability VALUES
+            ('E2024','left','BER','Guard', 30.0, 30),
+            ('E2024','gone','ZAL','Center', 18.0, 30)
+    """)
+    # ZAL is still in E2025; BER is not present at all.
+    con.execute("INSERT INTO boxscores_player VALUES ('E2025','other','ZAL')")
+    con.close()
+
+    rows = _vacated(path)
+    assert [r for r in rows if r[1] == "BER"] == []
+    assert [r for r in rows if r[1] == "ZAL"] != []

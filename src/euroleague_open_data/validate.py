@@ -92,13 +92,13 @@ def run_all(db_path: Path) -> dict[str, Any]:
             ),
             "SELECT count(*) FROM boxscores_team",
             """
-            SELECT t.game_code, t.is_home, t.points, sum(p.points)
+            SELECT t.season_code, t.game_code, t.is_home, t.points, sum(p.points)
             FROM boxscores_team t
             JOIN boxscores_player p
               ON p.season_code = t.season_code
              AND p.game_code = t.game_code
              AND p.is_home = t.is_home
-            GROUP BY t.game_code, t.is_home, t.points
+            GROUP BY t.season_code, t.game_code, t.is_home, t.points
             HAVING t.points IS DISTINCT FROM sum(p.points)
             """,
         )
@@ -113,20 +113,22 @@ def run_all(db_path: Path) -> dict[str, Any]:
                 "points implied by play-by-play scoring events equal the boxscore total",
                 "error",
             ),
-            "SELECT count(DISTINCT game_code) FROM play_by_play",
+            "SELECT count(DISTINCT (season_code, game_code)) FROM play_by_play",
             """
             WITH pbp AS (
-              SELECT game_code, team_code,
+              SELECT season_code, game_code, team_code,
                      sum(CASE play_type WHEN '2FGM' THEN 2 WHEN '3FGM' THEN 3
                                         WHEN 'FTM' THEN 1 ELSE 0 END) AS pts
               FROM play_by_play
               WHERE team_code IS NOT NULL
-              GROUP BY 1, 2
+              GROUP BY 1, 2, 3
             )
-            SELECT pbp.game_code, pbp.team_code, pbp.pts, b.points
+            SELECT pbp.season_code, pbp.game_code, pbp.team_code, pbp.pts, b.points
             FROM pbp
             JOIN boxscores_team b
-              ON b.game_code = pbp.game_code AND b.team_code = pbp.team_code
+              ON b.season_code = pbp.season_code
+             AND b.game_code = pbp.game_code
+             AND b.team_code = pbp.team_code
             WHERE pbp.pts IS DISTINCT FROM b.points
             """,
         )
@@ -141,17 +143,19 @@ def run_all(db_path: Path) -> dict[str, Any]:
                 "shot rows per team equal boxscore field goals attempted",
                 "warning",
             ),
-            "SELECT count(DISTINCT game_code) FROM shots",
+            "SELECT count(DISTINCT (season_code, game_code)) FROM shots",
             """
             WITH s AS (
-              SELECT game_code, team_code, count(*) AS n
+              SELECT season_code, game_code, team_code, count(*) AS n
               FROM shots
               WHERE action_id IN ('2FGA','2FGM','3FGA','3FGM')
-              GROUP BY 1, 2
+              GROUP BY 1, 2, 3
             )
-            SELECT s.game_code, s.team_code, s.n, b.fga
+            SELECT s.season_code, s.game_code, s.team_code, s.n, b.fga
             FROM s JOIN boxscores_team b
-              ON b.game_code = s.game_code AND b.team_code = s.team_code
+              ON b.season_code = s.season_code
+             AND b.game_code = s.game_code
+             AND b.team_code = s.team_code
             WHERE s.n IS DISTINCT FROM b.fga
             """,
         )
@@ -174,20 +178,21 @@ def run_all(db_path: Path) -> dict[str, Any]:
                 "play_number ranges of consecutive periods do not overlap",
                 "warning",
             ),
-            "SELECT count(DISTINCT game_code) FROM play_by_play",
+            "SELECT count(DISTINCT (season_code, game_code)) FROM play_by_play",
             """
             WITH spans AS (
-              SELECT game_code, period,
+              SELECT season_code, game_code, period,
                      min(play_number) AS lo, max(play_number) AS hi
               FROM play_by_play
-              GROUP BY 1, 2
+              GROUP BY 1, 2, 3
             ),
             adjacent AS (
-              SELECT game_code, period, lo, hi,
-                     lag(hi) OVER (PARTITION BY game_code ORDER BY period) AS prev_hi
+              SELECT season_code, game_code, period, lo, hi,
+                     lag(hi) OVER (PARTITION BY season_code, game_code ORDER BY period)
+                       AS prev_hi
               FROM spans
             )
-            SELECT game_code, period, prev_hi, lo
+            SELECT season_code, game_code, period, prev_hi, lo
             FROM adjacent
             WHERE prev_hi IS NOT NULL AND lo <= prev_hi
             """,
@@ -206,9 +211,9 @@ def run_all(db_path: Path) -> dict[str, Any]:
             ),
             "SELECT count(*) FROM play_by_play",
             """
-            SELECT game_code, play_number, count(*)
+            SELECT season_code, game_code, play_number, count(*)
             FROM play_by_play
-            GROUP BY 1, 2
+            GROUP BY 1, 2, 3
             HAVING count(*) > 1
             """,
         )

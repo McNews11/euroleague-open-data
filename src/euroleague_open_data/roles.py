@@ -189,6 +189,13 @@ current_roster AS (
 seasons_with_roster AS (
     SELECT DISTINCT season_code FROM current_roster
 ),
+-- ...and only clubs that are actually IN the later season. A club that left the
+-- competition looks like it vacated its entire roster, which is true and useless:
+-- nobody is joining it. Measured E2024 -> E2025, ALBA Berlin left and contributed
+-- 340 phantom vacated minutes across three positions.
+teams_in_season AS (
+    SELECT DISTINCT season_code, team_code FROM current_roster
+),
 departures AS (
     SELECT
         so.season_code                    AS season_code,
@@ -201,6 +208,8 @@ departures AS (
     FROM season_order so
     JOIN seasons_with_roster swr ON swr.season_code = so.season_code
     JOIN prior_production p ON p.season_code = so.prev_season
+    JOIN teams_in_season tis
+      ON tis.season_code = so.season_code AND tis.team_code = p.team_code
     LEFT JOIN current_roster c
       ON c.season_code = so.season_code
      AND c.team_code = p.team_code

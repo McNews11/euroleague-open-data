@@ -9,7 +9,7 @@ from pathlib import Path
 
 import duckdb
 
-from . import analytics, validate, warehouse
+from . import analytics, fantasy, roles, validate, warehouse
 from .crawl import crawl_season
 
 log = logging.getLogger(__name__)
@@ -59,6 +59,10 @@ def main() -> None:
     parser.add_argument("--exports", type=Path, default=Path("data/exports"))
     parser.add_argument("--report", type=Path, default=Path("docs/data-quality-report.json"))
     parser.add_argument(
+        "--teams", type=int, default=8, help="fantasy league size, sets draft replacement level"
+    )
+    parser.add_argument("--roster-size", type=int, default=13)
+    parser.add_argument(
         "--skip-crawl",
         action="store_true",
         help="rebuild from the existing cache without contacting upstream",
@@ -73,8 +77,11 @@ def main() -> None:
         report = crawl_season(args.competition, args.season, args.cache_dir)
         log.info("crawl: %s", json.dumps(report))
 
+    # Order matters: each stage reads tables the previous one created.
     warehouse.build(args.cache_dir, args.db, args.competition, args.season)
     analytics.build(args.db)
+    fantasy.build(args.db, teams=args.teams, roster_size=args.roster_size)
+    roles.build(args.db)
 
     quality = validate.run_all(args.db)
     args.report.parent.mkdir(parents=True, exist_ok=True)

@@ -514,6 +514,115 @@ def compare_draft_candidates(
     return _query(sql, [*person_codes, season])
 
 
+@mcp.tool()
+def get_coach_rotation(
+    season: str = "E2025",
+    team_code: str | None = None,
+    coach_name: str | None = None,
+) -> dict[str, Any]:
+    """How a coach distributes minutes. Use this to judge a player's minutes ceiling.
+
+    Rotation depth is the strongest lever on fantasy output that is not the player
+    himself: the same player scores more under a coach who plays nine men heavy minutes
+    than under one who rides seven. Rotation habits travel with the coach between clubs,
+    so this is keyed on the coach, not the team.
+
+    `rotation_style` is a tercile RELATIVE TO THIS COMPETITION, not an absolute standard.
+    Coaches with fewer than 10 games are labelled `insufficient_data` rather than guessed
+    at. `minute_concentration` is a Herfindahl index of minute shares: higher means
+    minutes are concentrated in fewer players.
+
+    Args:
+        season: season code, e.g. "E2025".
+        team_code: optional club code from search_teams.
+        coach_name: optional partial coach name.
+    """
+    sql = """
+        SELECT coach_name, team_code, games_coached, avg_players_used,
+               avg_players_15plus, avg_players_20plus, avg_top_minutes,
+               minute_concentration, rotation_style
+        FROM coach_rotation_profile
+        WHERE season_code = ?
+    """
+    params: list[Any] = [season]
+    if team_code:
+        sql += " AND team_code = ?"
+        params.append(team_code)
+    if coach_name:
+        sql += " AND lower(coach_name) LIKE lower('%' || ? || '%')"
+        params.append(coach_name)
+    sql += " ORDER BY avg_players_15plus DESC"
+    return _query(sql, params)
+
+
+@mcp.tool()
+def get_role_outlook(team_code: str, season: str = "E2025") -> dict[str, Any]:
+    """What minutes and production a club has vacated, by position, plus who remains.
+
+    This is the tool for "how will player X do at his new club" and for drafting anyone
+    without history in this competition.
+
+    Be honest about what this can and cannot do. If a player arrives from the NBA or a
+    domestic league, this warehouse holds ZERO rows for him and no projection is possible
+    from it. What IS knowable is the role he is walking into: the minutes and fantasy
+    production the club lost at his position, and how stable the surviving players' minutes
+    are. State the vacated role, state that the player's own level is an input you do not
+    have, and let the user supply it. Do not invent a projection.
+
+    Returned per position: vacated minutes and fantasy points per game from players whose
+    roster spell has ended, alongside the remaining players' minute stability.
+
+    Args:
+        team_code: club code from search_teams.
+        season: season code, e.g. "E2025".
+    """
+    vacated = _query(
+        """SELECT position_name, departed_players, vacated_minutes_per_game,
+                  vacated_fantasy_per_game, avg_departed_minutes,
+                  biggest_departure_minutes
+           FROM vacated_role
+           WHERE team_code = ? AND season_code = ?
+           ORDER BY vacated_minutes_per_game DESC""",
+        [team_code, season],
+    )
+    vacated_rows = vacated.get("rows") or []
+    remaining = _query(
+        """SELECT r.player_name, r.position_name, r.games_played, r.availability,
+                  r.minutes_per_game, r.minutes_stddev, r.team_minute_share,
+                  s.is_active, s.previous_team
+           FROM player_role_stability r
+           LEFT JOIN player_team_spells s
+             ON s.person_code = r.person_code AND s.season_code = r.season_code
+           WHERE r.team_code = ? AND r.season_code = ?
+           ORDER BY r.minutes_per_game DESC""",
+        [team_code, season],
+    )
+    coach = _query(
+        """SELECT coach_name, games_coached, avg_players_15plus, rotation_style
+           FROM coach_rotation_profile WHERE team_code = ? AND season_code = ?
+           ORDER BY games_coached DESC""",
+        [team_code, season],
+    )
+    result: dict[str, Any] = {
+        "vacated_by_position": vacated_rows,
+        "roster_minute_stability": remaining.get("rows"),
+        "coaching": coach.get("rows"),
+        "caveat": (
+            "Players arriving from outside this competition have no rows here. "
+            "Use the vacated role as the opportunity estimate; the player's own level "
+            "must come from outside this dataset."
+        ),
+    }
+    if not vacated_rows:
+        result["vacated_unavailable"] = (
+            f"No departure data for {season}. Vacated minutes are computed by comparing a "
+            "club's roster against the previous season, so the season before this one must "
+            "also be loaded. Say this plainly rather than reporting zero departures -- zero "
+            "loaded seasons and zero departures are different facts."
+        )
+    return result
+
+
 # ------------------------------------------------------------------------ resources
 
 

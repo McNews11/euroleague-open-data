@@ -149,10 +149,12 @@ class Extraction:
     boxscores_team: list[dict[str, Any]]
     shots: list[dict[str, Any]]
     play_by_play: list[dict[str, Any]]
+    coaches: list[dict[str, Any]]
+    player_team_spells: list[dict[str, Any]]
 
 
 def extract(cache: RawCache, comp: str, season: str) -> Extraction:
-    ex = Extraction([], [], [], [], [], [], [], [])
+    ex = Extraction([], [], [], [], [], [], [], [], [], [])
 
     # -- seasons ---------------------------------------------------------------
     for _url, body in cache.find(f"/competitions/{comp}/seasons"):
@@ -307,6 +309,52 @@ def extract(cache: RawCache, comp: str, season: str) -> Extraction:
                 trow.update(_stats_row(totals))
                 ex.boxscores_team.append(trow)
 
+            # One row per team per game, so a mid-season coaching change is visible as a
+            # change in this column rather than being flattened into a season-level fact.
+            coach = block.get("coach")
+            if isinstance(coach, dict) and coach.get("code"):
+                ex.coaches.append(
+                    {
+                        "season_code": season,
+                        "game_code": code,
+                        "team_code": team_code,
+                        "is_home": is_home,
+                        "coach_code": strip_id(coach.get("code")),
+                        "coach_name": coach.get("name"),
+                    }
+                )
+
+    # -- roster spells ---------------------------------------------------------
+    # The people endpoint carries startDate/endDate per club, plus `lastTeam` -- which is
+    # what makes it possible to see that a player arrived from somewhere, and when. A
+    # startDate in midwinter is a mid-season signing, not a summer transfer.
+    for _url, body in cache.find(f"/seasons/{season}/people"):
+        for entry in (body or {}).get("data", []):
+            if entry.get("type") != "J":  # J = player; the feed also carries staff
+                continue
+            person = entry.get("person") or {}
+            club = entry.get("club") or {}
+            person_code = _person_key_v2(person.get("code"))
+            if person_code is None:
+                continue
+            ex.player_team_spells.append(
+                {
+                    "season_code": season,
+                    "person_code": person_code,
+                    "player_name": person.get("name"),
+                    "team_code": club.get("code"),
+                    "team_name": club.get("name"),
+                    "previous_team": entry.get("lastTeam"),
+                    "start_date": entry.get("startDate"),
+                    "end_date": entry.get("endDate"),
+                    "is_active": entry.get("active"),
+                    "dorsal": entry.get("dorsal"),
+                    "position": entry.get("position"),
+                    "position_name": entry.get("positionName"),
+                }
+            )
+        break
+
     # -- shots -----------------------------------------------------------------
     for url, body in cache.find("/api/Points", f"seasoncode={season}"):
         code = int(url.split("gamecode=")[1].split("&")[0])
@@ -393,6 +441,8 @@ def build(cache_dir: Path, db_path: Path, comp: str, season: str) -> Path:
         ("boxscores_team", ex.boxscores_team),
         ("shots", ex.shots),
         ("play_by_play", ex.play_by_play),
+        ("coaches", ex.coaches),
+        ("player_team_spells", ex.player_team_spells),
     ]:
         if not rows:
             log.warning("table %s is empty -- skipping", table)

@@ -1,0 +1,172 @@
+# euroleague-open-data
+
+An open EuroLeague / EuroCup basketball data warehouse, and an MCP server that lets an
+LLM query it in natural language.
+
+> **Unofficial.** Not affiliated with, endorsed by, or approved by Euroleague Basketball.
+> Data originates from Euroleague Basketball and is retrieved from publicly accessible
+> endpoints. For research and educational use. See [DISCLAIMER.md](DISCLAIMER.md).
+
+## Why this exists
+
+The upstream EuroLeague API is undocumented, unversioned, and rate-limited at roughly
+**10 requests per minute** by Cloudflare. That makes it unusable for interactive analysis:
+three questions in a row from one user would black out everyone else for five minutes.
+
+So this project inverts the problem. A slow, polite, resumable crawler pulls the data into
+a local DuckDB warehouse once. Everything else — the MCP server, the Parquet exports —
+reads that snapshot.
+
+**The MCP server never contacts upstream.** It holds no HTTP client. No amount of traffic
+to this project can generate load on Euroleague Basketball's infrastructure.
+
+## Status
+
+V0 — one season (`E2025`), EuroLeague only, proving the full path end to end.
+
+| Component | State |
+|---|---|
+| Throttled crawler with permanent cache | working |
+| DuckDB warehouse, 8 base tables | working |
+| Validation suite, 8 reconciliation checks | working |
+| Derived analytics (TS%, eFG%, usage, Four Factors, shot zones) | working |
+| MCP server, stdio transport, 7 tools + 3 resources | working |
+| Full backfill (52 seasons, 12 122 games) | not started |
+| HTTP transport, hosting, dataset publishing | not started |
+
+## Quick start
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12+.
+
+```bash
+git clone <this repo> && cd euroleague-open-data
+uv sync
+```
+
+Build the warehouse. The crawl is deliberately slow — about two hours for one season —
+and it is safe to interrupt and rerun, because every response is cached permanently.
+
+```bash
+uv run euroleague-etl --season E2025
+```
+
+Already have the cache and only changed the schema? Skip the network entirely:
+
+```bash
+uv run euroleague-etl --season E2025 --skip-crawl
+```
+
+## Connect it to Claude
+
+### Claude Code
+
+```bash
+claude mcp add euroleague --env EUROLEAGUE_DB=$PWD/data/euroleague.duckdb -- $PWD/.venv/bin/python -m euroleague_open_data.mcp_server
+```
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "euroleague": {
+      "command": "/absolute/path/to/euroleague-open-data/.venv/bin/python",
+      "args": ["-m", "euroleague_open_data.mcp_server"],
+      "env": {
+        "EUROLEAGUE_DB": "/absolute/path/to/euroleague-open-data/data/euroleague.duckdb"
+      }
+    }
+  }
+}
+```
+
+## Things to ask it
+
+```
+Who had the best true shooting percentage in EuroLeague last season, minimum 20 games?
+Compare Vezenkov and Nwora on efficiency and usage.
+Which team had the best defensive rating, and which Four Factor drove it?
+Show me Micic's shot chart by zone.
+Which games are unreliable for lineup analysis?
+```
+
+That last one matters. The warehouse tracks its own completeness, so the model can say
+"this game has no shot data" instead of inventing a number.
+
+## Tools
+
+| Tool | Purpose |
+|---|---|
+| `search_players` | fuzzy name → canonical `person_code` |
+| `search_teams` | fuzzy name → canonical `team_code`, handles sponsor renames |
+| `get_player_stats` | season or career, totals / per-game / per-36, plus TS%, eFG%, usage |
+| `get_team_stats` | ratings and Four Factors, team and opponent |
+| `get_game_boxscore` | full game detail with completeness flags |
+| `get_shot_chart` | zone aggregates, optionally raw x/y coordinates |
+| `run_sql` | read-only DuckDB SELECT — the escape hatch for unanticipated questions |
+
+Resources: `euroleague://schema`, `euroleague://coverage`, `euroleague://data-quality`.
+
+`run_sql` runs on a read-only connection, permits a single `SELECT`/`WITH`, caps rows, and
+cancels after 15 seconds.
+
+## Data quality
+
+Validation runs as part of every ETL run and writes
+[`docs/data-quality-report.json`](docs/data-quality-report.json), which is committed so
+regressions show up in `git log`.
+
+Three findings worth knowing about, all documented in
+[`docs/api-notes.md`](docs/api-notes.md):
+
+1. **Shot coordinates and play-by-play begin at the 2007 season.** Earlier seasons have
+   boxscores only. This is a property of the source, not of this project.
+2. **Period buckets and event sequence numbers disagree in roughly 40% of games.**
+   `NUMBEROFPLAY` is unique and reliable; the per-quarter arrays upstream returns are not.
+   Affected games are flagged `lineup_safe = false`.
+3. **Player identifiers differ across endpoints.** Boxscores use `TGB`, the live feed uses
+   `PTGB`. Normalisation is source-aware, and there is a regression test for it.
+
+## Coverage
+
+Measured across all 52 seasons on 2026-08-10 (`docs/coverage.json`):
+
+| Segment | Seasons | Games | Boxscore | PBP + shots |
+|---|---|---|---|---|
+| EuroLeague | E2000–E2006 | 1 563 | yes | no |
+| EuroCup | U2002–U2006 | 896 | yes | no |
+| Both | 2007–2025 | 9 059 | yes | yes |
+| **Total** | **52** | **12 122** | | |
+
+## Development
+
+```bash
+uv run pytest
+uv run ruff check src tests
+uv run mypy src
+```
+
+## Licence and contact
+
+Code is MIT — see [LICENSE](LICENSE). **The licence covers the code only.** It grants no
+rights in the underlying match data, which belongs to Euroleague Basketball and its data
+partners. Commercial use of the data may require a licence from them.
+
+**Takedown:** if you represent a rights holder and want this changed or removed, open a
+GitHub issue titled `TAKEDOWN`. We will respond within 7 days and will take published
+datasets down on request while any disagreement is discussed. No formal legal process is
+needed to get our attention.
+
+## Prior art
+
+- [`giasemidis/euroleague_api`](https://github.com/giasemidis/euroleague_api) — Python
+  wrapper. The shot-coordinate endpoint used here was reverse-engineered there first.
+- [`FlavioLeccese92/euroleaguer`](https://github.com/FlavioLeccese92/euroleaguer) — R
+  wrapper, useful for cross-checking endpoint coverage.
+- [`bsamot10/EuroleagueDataETL`](https://github.com/bsamot10/EuroleagueDataETL) — existing
+  ETL patterns for this data.
+- [`vtzimpl/euroleague-api-mcp`](https://github.com/vtzimpl/euroleague-api-mcp) — an
+  earlier MCP server that proxies the API directly. Given the rate limit measured here,
+  proxying is the thing this project deliberately avoids.

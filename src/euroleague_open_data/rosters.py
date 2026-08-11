@@ -20,12 +20,18 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import duckdb
 
-from . import sources
-from .http import ThrottledClient
+if TYPE_CHECKING:  # pragma: no cover
+    from .http import ThrottledClient
+
+# The crawler's dependencies are deliberately absent from the deployed image -- httpx is
+# needed to BUILD a warehouse, never to read one. The MCP server imports this module only
+# for its SQL, so anything that reaches for the network is imported inside the function
+# that needs it. Importing it at module scope crashed a deployment with
+# ModuleNotFoundError: httpx, before the server had served a single request.
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +40,8 @@ PLAYER_TYPE = "J"  # 'J' = player; coaches and staff share the endpoint
 
 def fetch_rosters(client: ThrottledClient, comp: str, season: str) -> list[dict[str, Any]]:
     """Every club's announced squad for `season`, one request per club."""
+    from . import sources
+
     envelope = client.get_json(sources.clubs(comp, season))
     clubs = (envelope or {}).get("data") or []
     if not clubs:
@@ -174,6 +182,8 @@ ORDER BY classic_per_game DESC NULLS LAST
 
 
 def crawl_and_load(db_path: Path, cache_dir: Path, comp: str, season: str) -> int:
+    from .http import ThrottledClient
+
     with ThrottledClient(cache_dir) as client:
         rows = fetch_rosters(client, comp, season)
     con = duckdb.connect(str(db_path))

@@ -58,6 +58,24 @@ PRESSURE_HIGH = 1.25
 PRESSURE_LOW = 0.89
 PRESSURE_PENALTY = 2.8
 
+# EuroCup production, converted to a EuroLeague equivalent.
+#
+# 40 players went U2024 -> E2025 with 10+ games in both. Median ratio 0.57, mean 0.58.
+# That single number hides the only thing that decides it:
+#
+#     kept 80%+ of their minutes   n=19   median 0.84
+#     lost minutes                 n=21   median 0.21
+#
+# The step between competitions costs almost nothing. Not playing costs everything.
+# Whether pressure predicts which happens was checked too, and the direction holds --
+# low-pressure arrivals landed at 0.57, high-pressure at 0.24 -- but with n=4 in the high
+# group that is not enough to justify a two-factor model. So one conservative factor is
+# applied here and the ordinary pressure penalty does its work on top, as it does for
+# everyone else. The two may overlap slightly; these rows are the least certain on the
+# board and are labelled as such rather than blended in silently.
+EUROCUP_FACTOR = 0.57
+EUROCUP_MIN_GAMES = 8
+
 # Minutes each club actually gave each position last season, and what the announced squad
 # would want if everyone kept their previous workload.
 PRESSURE_SQL = """
@@ -104,6 +122,50 @@ FROM announced_rosters a
 LEFT JOIN claim c ON c.team_code = a.team_code AND c.position = a.position
 LEFT JOIN pot   p ON p.team_code = a.team_code AND p.position = a.position
 WHERE a.season_code = ? AND a.person_code <> ''
+"""
+
+
+# Players on a next-season roster whose only history is the second-tier competition.
+# Without this they read as "new_to_competition" and vanish from the board entirely, even
+# though a full season of them is sitting in the warehouse.
+EUROCUP_FALLBACK_SQL = f"""
+WITH candidate AS (
+    SELECT a.person_code, a.player_name, a.position, a.team_name
+    FROM announced_rosters a
+    WHERE a.season_code = ? AND a.person_code <> ''
+      AND a.person_code NOT IN (
+          SELECT DISTINCT person_code FROM fantasy_points_game WHERE season_code = ?)
+      AND a.person_code NOT IN (
+          SELECT person_code FROM player_overrides
+          WHERE status IN ('left_league', 'retired', 'unavailable'))
+),
+-- Best available evidence, in order. A real EuroLeague number from an older season beats
+-- a converted one from the second tier: Zizic played the EuroLeague in 2024-25 and
+-- averaged 8.85 there, which is worth more than his 22.19 EuroCup average scaled by a
+-- league-wide factor. Ranking him on the estimate buried the fact.
+graded AS (
+    SELECT c.person_code, c.player_name, c.position, c.team_name,
+           f.season_code, avg(f.fantasy_classic) AS raw, count(*) AS gp,
+           CASE WHEN f.season_code LIKE 'E%' THEN 1 ELSE 2 END AS tier
+    FROM candidate c
+    JOIN fantasy_points_game f ON f.person_code = c.person_code
+    GROUP BY 1, 2, 3, 4, 5
+    HAVING count(*) >= {EUROCUP_MIN_GAMES}
+),
+best AS (
+    SELECT *, row_number() OVER (
+        PARTITION BY person_code ORDER BY tier, season_code DESC) AS rn
+    FROM graded
+)
+SELECT person_code, player_name, position, team_name AS next_team,
+       position AS next_position,
+       round(raw * CASE WHEN tier = 1 THEN 1.0 ELSE {EUROCUP_FACTOR} END, 2) AS value_per_game,
+       round(raw, 2) AS source_value,
+       gp AS games_played,
+       season_code AS source_season,
+       CASE WHEN tier = 1 THEN season_code
+            ELSE season_code || ' x ' || {EUROCUP_FACTOR} END AS value_source
+FROM best WHERE rn = 1
 """
 
 

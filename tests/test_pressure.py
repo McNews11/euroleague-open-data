@@ -75,5 +75,6 @@ def test_pressure_can_be_switched_off_entirely(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(mcp_server, "_query", fake)
     mcp_server.get_draft_board(teams=8, limit=3, adjust_for_minutes=False)
     board_sql = seen[-1]
-    assert "ORDER BY b.vorp_per_game" in board_sql
+    # The projection is wrapped before ordering now, so the sort key carries no alias.
+    assert "ORDER BY vorp_per_game" in board_sql
     assert "ORDER BY adjusted_per_game" not in board_sql

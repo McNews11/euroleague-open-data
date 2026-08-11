@@ -411,6 +411,7 @@ def get_draft_board(
     scoring: str = "classic",
     next_season: str = "E2026",
     adjust_for_minutes: bool = True,
+    second_tier: str = "U2025",
 ) -> dict[str, Any]:
     """Rank players for a BasketNews Fantasy DRAFT by value over replacement.
 
@@ -505,6 +506,7 @@ def get_draft_board(
         pressure AS ({rosters.PRESSURE_SQL})
         SELECT b.overall_rank AS raw_rank, b.player_name, b.position, b.team_code,
                b.games_played, b.minutes_per_game, b.{value} AS value_per_game,
+               'EuroLeague 2025-26' AS value_source,
                b.vorp_per_game, b.consistency_ratio,
                pr.next_team, pr.next_position, pr.minute_pressure,
                CASE WHEN pr.minute_pressure >= {rosters.PRESSURE_HIGH} THEN 'high'
@@ -524,9 +526,33 @@ def get_draft_board(
     if position:
         sql += " AND lower(b.position) = lower(?)"
         params.append(position)
+
+    if second_tier:
+        # Same shape, same pressure penalty, but the value came from the other
+        # competition and is labelled so nobody reads it as a like-for-like number.
+        sql += f"""
+        UNION ALL
+        SELECT NULL AS raw_rank, s.player_name, s.position, NULL AS team_code,
+               s.games_played, NULL AS minutes_per_game, s.value_per_game,
+               s.value_source,
+               NULL AS vorp_per_game, NULL AS consistency_ratio,
+               s.next_team, s.next_position, pr2.minute_pressure,
+               CASE WHEN pr2.minute_pressure >= {rosters.PRESSURE_HIGH} THEN 'high'
+                    WHEN pr2.minute_pressure <= {rosters.PRESSURE_LOW} THEN 'low'
+                    ELSE 'normal' END AS pressure_band,
+               round(s.value_per_game - CASE WHEN pr2.minute_pressure >= {rosters.PRESSURE_HIGH}
+                                             THEN {rosters.PRESSURE_PENALTY} ELSE 0 END, 2)
+                   AS adjusted_per_game
+        FROM ({rosters.EUROCUP_FALLBACK_SQL}) s
+        LEFT JOIN ({rosters.PRESSURE_SQL}) pr2 USING (person_code)
+        """
+        params += [next_season, season]
+        params += rosters.pressure_params(season, next_season)
+
+    sql = f"SELECT * FROM ({sql})"
     sql += (
-        f" ORDER BY {'adjusted_per_game' if adjust_for_minutes else 'b.vorp_per_game'}"
-        " DESC LIMIT ?"
+        f" ORDER BY {'adjusted_per_game' if adjust_for_minutes else 'vorp_per_game'}"
+        " DESC NULLS LAST LIMIT ?"
     )
     params.append(min(limit, MAX_ROWS))
 

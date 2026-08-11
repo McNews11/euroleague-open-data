@@ -178,7 +178,13 @@ def build_app(host: str | list[str] | None = None) -> Starlette:
         # restarted or replaced without breaking a client mid-session. The warehouse is
         # read-only, so there is no session state worth keeping anyway.
         stateless_http=True,
-        json_response=False,
+        # Plain JSON responses rather than an SSE stream per request. Streaming exists so
+        # a server can push notifications or progress mid-call; this one never does --
+        # every tool is a read-only query that answers once. Keeping SSE cost real
+        # reliability: behind Render's proxy, the server closing each stream left the
+        # pooled upstream connection in a state the router treated as dead, and roughly
+        # half of all requests came back as a 404 that never reached the container.
+        json_response=True,
         transport_security=security,
     )
     app.routes.insert(0, Route("/", landing, methods=["GET"]))

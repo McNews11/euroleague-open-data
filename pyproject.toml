@@ -11,11 +11,14 @@ dependencies = [
     "polars>=1.0",
     "pyarrow>=17",
     "mcp[cli]>=1.2",
+    "uvicorn>=0.30",
+    "starlette>=0.37",
 ]
 
 [project.scripts]
 euroleague-etl = "euroleague_open_data.cli:main"
 euroleague-mcp = "euroleague_open_data.mcp_server:main"
+euroleague-mcp-http = "euroleague_open_data.server_http:main"
 
 [dependency-groups]
 dev = [

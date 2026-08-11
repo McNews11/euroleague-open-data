@@ -22,7 +22,7 @@ to this project can generate load on Euroleague Basketball's infrastructure.
 
 ## Status
 
-V0 — one season (`E2025`), EuroLeague only, proving the full path end to end.
+Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025.
 
 | Component | State |
 |---|---|
@@ -30,8 +30,9 @@ V0 — one season (`E2025`), EuroLeague only, proving the full path end to end.
 | DuckDB warehouse, 8 base tables | working |
 | Validation suite, 8 reconciliation checks | working |
 | Derived analytics (TS%, eFG%, usage, Four Factors, shot zones) | working |
-| MCP server, stdio transport, 7 tools + 3 resources | working |
-| Full backfill (52 seasons, 12 122 games) | not started |
+| MCP server, stdio transport, 13 tools + 3 resources | working |
+| HTTP transport + landing page + Dockerfile | working locally, not yet deployed |
+| Full backfill (52 seasons, 12 122 games) | not started, ~50h of crawling |
 | HTTP transport, hosting, dataset publishing | not started |
 
 ## Quick start
@@ -63,6 +64,19 @@ uv run euroleague-etl --season E2025 --skip-crawl
 ```bash
 claude mcp add euroleague --env EUROLEAGUE_DB=$PWD/data/euroleague.duckdb -- $PWD/.venv/bin/python -m euroleague_open_data.mcp_server
 ```
+
+### Remote, for sharing with other people
+
+A hosted deployment serves the same tools over HTTPS, so anyone can connect by URL with
+nothing installed — and it is the **only** way to use this from ChatGPT, which cannot run
+local MCP servers. See [docs/DEPLOY.md](docs/DEPLOY.md).
+
+```bash
+claude mcp add --transport http euroleague https://<your-deployment>/mcp
+```
+
+Note that ChatGPT custom connectors require a paid plan (Plus, Pro, Business, Enterprise
+or Edu) with Developer mode enabled. Claude Code and Claude Desktop work on any plan.
 
 ### Claude Desktop
 

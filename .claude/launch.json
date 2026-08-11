@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "euroleague-mcp-http",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "euroleague_open_data.server_http"],
+      "port": 7860
+    }
+  ]
+}

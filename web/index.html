@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EuroLeague Open Data — MCP server</title>
+<meta name="description" content="Query EuroLeague and EuroCup basketball data in natural language from Claude or ChatGPT. Unofficial, open source.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa; --fg: #1a1a18; --muted: #6b6b66; --line: #e3e3df;
+    --code-bg: #f2f2ef; --accent: #b4530a; --card: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --fg: #ececea; --muted: #9a9a94; --line: #2e2e2a;
+      --code-bg: #201f1d; --accent: #e08a48; --card: #1c1b19;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.25rem 6rem; }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 .4rem; letter-spacing: -.02em; }
+  h2 {
+    font-size: 1.05rem; margin: 3rem 0 .85rem; letter-spacing: -.01em;
+    padding-bottom: .4rem; border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: .95rem; margin: 1.75rem 0 .5rem; }
+  p { margin: 0 0 1rem; }
+  .lede { color: var(--muted); font-size: 1.05rem; margin-bottom: 1.75rem; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86em;
+    background: var(--code-bg); padding: .12em .38em; border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: .85rem 1rem; overflow-x: auto; margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; font-size: .82rem; line-height: 1.55; }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: .75rem; margin: 0 0 1rem;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: .7rem .85rem;
+  }
+  .stat b { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: .78rem; }
+  .note {
+    border-left: 3px solid var(--accent); padding: .1rem 0 .1rem .9rem;
+    margin: 1.25rem 0; color: var(--muted);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; margin-bottom: 1rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; color: var(--muted); font-size: .78rem; text-transform: uppercase;
+       letter-spacing: .04em; }
+  td code { font-size: .82em; }
+  .scroll { overflow-x: auto; }
+  footer {
+    margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: .85rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>EuroLeague Open Data</h1>
+  <p class="lede">
+    Ask an AI assistant real questions about EuroLeague and EuroCup basketball — boxscores,
+    shot charts, play-by-play, advanced metrics and fantasy draft rankings — in plain
+    language.
+  </p>
+
+  <div class="stats">
+    <div class="stat"><b>4</b><span>seasons</span></div>
+    <div class="stat"><b>1,123</b><span>games</span></div>
+    <div class="stat"><b>178,177</b><span>shots</span></div>
+    <div class="stat"><b>625,187</b><span>play-by-play events</span></div>
+  </div>
+
+  <p>
+    EuroLeague <code>2024-25</code> and <code>2025-26</code>, EuroCup <code>2024-25</code>
+    and <code>2025-26</code>. Every number is reconciled against the official boxscore
+    before it is published — see <a href="#quality">data quality</a>.
+  </p>
+
+  <h2>Connect it</h2>
+
+  <h3>Claude Code</h3>
+  <p>One command. Runs locally, works on any plan, no account needed.</p>
+<pre><code>claude mcp add --transport http euroleague https://YOUR-DEPLOYMENT/mcp</code></pre>
+
+  <h3>Claude Desktop</h3>
+  <p>Settings → Connectors → Add custom connector, then paste:</p>
+<pre><code>https://YOUR-DEPLOYMENT/mcp</code></pre>
+
+  <h3>ChatGPT</h3>
+  <p>
+    Settings → Apps → Advanced settings → enable <b>Developer mode</b>, then add a custom
+    connector pointing at the same URL.
+  </p>
+  <div class="note">
+    <b>ChatGPT needs a paid plan for this.</b> Custom connectors are available on Plus,
+    Pro, Business, Enterprise and Edu — not on the free tier. ChatGPT also cannot run
+    local MCP servers at all, which is why this one is hosted. Claude Desktop and Claude
+    Code have no such restriction.
+  </div>
+
+  <h2>Things to ask</h2>
+<pre><code>Who had the best true shooting percentage in EuroLeague last season,
+  minimum 20 games?
+
+I pick 3rd in an 8-team fantasy draft — who should I target, and which
+  positions thin out before my second pick?
+
+Compare Vezenkov and Milutinov for a draft pick. Who has the higher floor?
+
+Which coaches play the deepest rotations, and who benefits?
+
+Which EuroCup players have no EuroLeague history? They are the hardest
+  to value in a draft.</code></pre>
+
+  <h2>What it can answer</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>Area</th><th>Detail</th></tr>
+    <tr><td>Boxscores</td><td>per player and per team, every game</td></tr>
+    <tr><td>Shot charts</td><td>x/y coordinates and zone aggregates</td></tr>
+    <tr><td>Play-by-play</td><td>every event, filterable</td></tr>
+    <tr><td>Advanced</td><td>true shooting, eFG, usage, ratings, Four Factors, pace</td></tr>
+    <tr><td>Fantasy</td><td>BasketNews scoring, draft board, snake planner, coach rotations</td></tr>
+    <tr><td>Free-form</td><td>read-only SQL, for anything the tools do not cover</td></tr>
+  </table>
+  </div>
+
+  <h2 id="quality">Data quality</h2>
+  <p>
+    Every build runs reconciliation checks and refuses to publish if a blocking one fails:
+    team totals against final scores, player sums against team totals, play-by-play scoring
+    against boxscores, shot counts against attempts.
+  </p>
+  <p>
+    Known limitations are published rather than hidden. Shot and play-by-play data exist
+    from the 2007 season onward only. In roughly 40% of games the upstream's own period
+    grouping contradicts its event sequence, so those games are flagged as unreliable for
+    lineup analysis instead of being silently used. The server reports what is missing
+    rather than estimating it.
+  </p>
+
+  <h2>How it works</h2>
+  <p>
+    A rate-limited crawler collects data into a local DuckDB warehouse. The MCP server
+    reads that snapshot and <b>never contacts the upstream API</b> — it holds no HTTP
+    client at all. No amount of traffic here can generate load on Euroleague Basketball's
+    infrastructure.
+  </p>
+
+  <footer>
+    <p>
+      <b>Unofficial.</b> Not affiliated with, endorsed by, or approved by Euroleague
+      Basketball. Data originates from Euroleague Basketball and is retrieved from
+      publicly accessible endpoints. Provided for research and educational use, without
+      warranty. Commercial use of the underlying data may require a licence from the
+      rights holders.
+    </p>
+    <p>
+      Source code is MIT licensed. The licence covers the code only, not the data.
+      Rights holders wanting this changed or removed: open a GitHub issue titled
+      <code>TAKEDOWN</code> — we respond within 7 days, no legal process needed.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

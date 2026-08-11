@@ -1,0 +1,17 @@
+# The raw crawl cache is ~2 GB of upstream JSON and is only needed to rebuild the
+# warehouse. The image ships the built warehouse instead.
+data/cache/
+data/exports/
+data/*.log
+data/*.pid
+data/crawl-report*.json
+
+.git/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+tests/
+docs/
+scripts/

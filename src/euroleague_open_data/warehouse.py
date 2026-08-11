@@ -523,7 +523,7 @@ def build(
 
 
 def _to_arrow(rows: list[dict[str, Any]]) -> Any:
-    import pyarrow as pa
+    import pyarrow as pa  # type: ignore[import-untyped]  # ships no py.typed marker
 
     keys: list[str] = []
     for row in rows:

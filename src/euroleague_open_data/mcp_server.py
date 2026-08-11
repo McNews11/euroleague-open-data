@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -49,8 +50,17 @@ FORBIDDEN_SQL = (
     "set",
 )
 
+def _version() -> str:
+    """Reported to clients on connect, so a stale deployment can be identified."""
+    try:
+        return metadata.version("euroleague-open-data")
+    except metadata.PackageNotFoundError:  # running from a source tree without an install
+        return "0.0.0+dev"
+
+
 mcp = MCPServer(
     "euroleague-open-data",
+    version=_version(),
     instructions=(
         "Unofficial EuroLeague/EuroCup basketball warehouse. Data originates from "
         "Euroleague Basketball and is served from a local snapshot -- never live. "

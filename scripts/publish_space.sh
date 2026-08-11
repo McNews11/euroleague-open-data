@@ -32,11 +32,24 @@ if [[ ! -f "$DB" ]]; then
     echo "error: $DB does not exist. Run the ETL first." >&2
     exit 1
 fi
-GAMES=$(python3 -c "
-import duckdb, sys
+#
+# Use the project interpreter, not whatever `python3` resolves to -- the system one has
+# no duckdb, and a failed check must not be mistaken for an empty warehouse. The two
+# outcomes get different exit paths for exactly that reason.
+PY="$REPO_ROOT/.venv/bin/python"
+if [[ ! -x "$PY" ]]; then
+    echo "error: $PY not found. Run 'uv sync' first." >&2
+    exit 1
+fi
+
+if ! GAMES=$("$PY" -c "
+import duckdb
 con = duckdb.connect('$DB', read_only=True)
 print(con.execute('SELECT count(*) FROM games').fetchone()[0])
-" 2>/dev/null || echo 0)
+"); then
+    echo "error: could not read the warehouse. That is not the same as it being empty." >&2
+    exit 1
+fi
 if [[ "$GAMES" -lt 1 ]]; then
     echo "error: warehouse has no games. Refusing to publish an empty dataset." >&2
     exit 1
@@ -46,7 +59,9 @@ echo "warehouse: $GAMES games, $(du -h "$DB" | cut -f1)"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/data"
 
-cp "$REPO_ROOT/pyproject.toml" "$REPO_ROOT/Dockerfile" "$STAGE/"
+# .dockerignore matters here: without it the staged .git directory, LFS objects and all,
+# is uploaded as build context.
+cp "$REPO_ROOT/pyproject.toml" "$REPO_ROOT/Dockerfile" "$REPO_ROOT/.dockerignore" "$STAGE/"
 cp "$REPO_ROOT/LICENSE" "$REPO_ROOT/DISCLAIMER.md" "$STAGE/"
 cp -R "$REPO_ROOT/src" "$REPO_ROOT/web" "$STAGE/"
 cp "$DB" "$STAGE/data/euroleague.duckdb"

@@ -33,7 +33,7 @@ Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025.
 | MCP server, stdio transport, 13 tools + 3 resources | working |
 | HTTP transport + landing page + Dockerfile | working locally, not yet deployed |
 | Full backfill (52 seasons, 12 122 games) | not started, ~50h of crawling |
-| HTTP transport, hosting, dataset publishing | not started |
+| Hosting, dataset publishing to GitHub Releases | not started |
 
 ## Quick start
 

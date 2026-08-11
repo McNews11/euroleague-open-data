@@ -31,66 +31,73 @@ ever read.
 
 ### Steps
 
-These need your accounts, so they are yours to do. Nothing here can be automated on your
-behalf.
+Steps 1 and 3 need your HuggingFace account, so they are yours. The rest is scripted.
 
 1. **Create the Space.** Sign in at [huggingface.co](https://huggingface.co), then
-   New Space → SDK **Docker** → visibility **Public**.
+   New Space → name `euroleague-open-data` → SDK **Docker** → visibility **Public**.
 
-2. **Point it at this repo, or push directly.** The Space is a git repo:
-
-   ```bash
-   git remote add space https://huggingface.co/spaces/<you>/euroleague-open-data
-   git push space main
-   ```
-
-3. **The warehouse must be in the pushed repo.** It is ~23 MB and gitignored by default.
-   Track it with LFS for the Space:
+2. **Build the Space tree.** `scripts/publish_space.sh` generates `build/space` from the
+   current source: it copies what the image needs, bakes the real hostname into the
+   landing page, writes the HF README frontmatter, sets up LFS for the warehouse, and
+   refuses to publish if the warehouse is missing or empty.
 
    ```bash
-   git lfs install
-   git lfs track "data/euroleague.duckdb"
-   git add -f data/euroleague.duckdb .gitattributes
-   git commit -m "Ship the warehouse with the image"
+   scripts/publish_space.sh <your-hf-username>/euroleague-open-data
    ```
 
-4. **Set the Space metadata.** HuggingFace reads YAML frontmatter from `README.md`. Add
-   this to the top of the README **on the Space branch only** — it is Space-specific and
-   does not belong in the GitHub README:
+   The Space is a generated artefact rather than a branch, so refreshing it later is a
+   rerun, never a merge conflict.
 
-   ```yaml
-   ---
-   title: EuroLeague Open Data
-   emoji: 🏀
-   colorFrom: gray
-   colorTo: orange
-   sdk: docker
-   app_port: 7860
-   pinned: false
-   ---
-   ```
-
-5. **Set `PUBLIC_HOST`.** In the Space's Settings → Variables, add:
-
-   ```
-   PUBLIC_HOST = <you>-euroleague-open-data.hf.space
-   ```
-
-   This is not optional. DNS-rebinding protection rejects requests whose `Host` header is
-   not allow-listed, and the allow-list starts empty. Without it the server refuses every
-   request from the real domain.
-
-6. **Verify from outside.** Once the build finishes:
+3. **Push.** Git will ask for your HF username and a token as the password — create one at
+   [Settings → Access Tokens](https://huggingface.co/settings/tokens) with **write**
+   permission.
 
    ```bash
-   curl https://<you>-euroleague-open-data.hf.space/health
+   git -C build/space push --force origin main
+   ```
+
+4. **Set `PUBLIC_HOST`.** In the Space's Settings → Variables and secrets, add:
+
+   ```
+   PUBLIC_HOST = <your-hf-username>-euroleague-open-data.hf.space
+   ```
+
+   This is not optional, and getting it wrong is hard to diagnose: the server compares the
+   `Host` header against an allow-list that starts empty, so every request comes back as a
+   bare `421` that looks exactly like the Space being down. Accepts a comma-separated list
+   if you later add a custom domain.
+
+   If something still returns 421 in the wild, set `DISABLE_HOST_CHECK=1` to switch host
+   validation off without a rebuild. It is a safe fallback here — the protection guards
+   servers bound to loopback, and this one is public, read-only and unauthenticated.
+
+5. **Verify from outside.** Once the build finishes:
+
+   ```bash
+   curl https://<your-hf-username>-euroleague-open-data.hf.space/health
    ```
 
    A healthy response lists the loaded seasons. It queries the warehouse rather than just
    returning 200, so a container that started without its data reports unhealthy.
 
-7. **Update the landing page URL.** Replace `YOUR-DEPLOYMENT` in `web/index.html` with the
-   real hostname, then push again.
+### What has been verified locally
+
+The image is build-tested, not merely written. Against the running container:
+
+| Check | Result |
+|---|---|
+| `docker build` | succeeds, 915 MB |
+| `/health` | `ok`, 1 123 games across 4 seasons |
+| `/` landing page | serves the real 7 450-byte page, not the fallback stub |
+| MCP handshake | protocol `2025-11-25`, 13 tools, 3 resources |
+| `run_sql` guardrail | refuses `DROP TABLE` over HTTP |
+| Host `…hf.space` | 200 |
+| Host `evil.example.com` | 421 |
+| Docker `HEALTHCHECK` | healthy |
+
+The local build is arm64 and HuggingFace builds amd64 from the same Dockerfile, so the
+build itself is re-run there; what is proven here is the Dockerfile's logic, not its
+portability.
 
 ## Refreshing the data
 
@@ -101,7 +108,8 @@ then push.
 uv run euroleague-etl --competition E --season E2026     # crawl one season
 uv run euroleague-etl --skip-crawl                        # rebuild everything from cache
 uv run pytest
-git add -f data/euroleague.duckdb && git commit -m "Refresh warehouse" && git push space main
+scripts/publish_space.sh <your-hf-username>/euroleague-open-data
+git -C build/space push --force origin main
 ```
 
 The crawl is slow on purpose — roughly 10 requests per minute, which is what the upstream

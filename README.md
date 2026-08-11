@@ -31,7 +31,7 @@ Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025.
 | Validation suite, 8 reconciliation checks | working |
 | Derived analytics (TS%, eFG%, usage, Four Factors, shot zones) | working |
 | MCP server, stdio transport, 13 tools + 3 resources | working |
-| HTTP transport + landing page + Dockerfile | working locally, not yet deployed |
+| HTTP transport + landing page, Docker image build-tested | working, not yet deployed |
 | Full backfill (52 seasons, 12 122 games) | not started, ~50h of crawling |
 | Hosting, dataset publishing to GitHub Releases | not started |
 

@@ -88,6 +88,33 @@ just the request that caused it. DuckDB is therefore capped at `DUCKDB_MEMORY_LI
 (default 256 MB) so a heavy `run_sql` spills to disk or fails alone. Raise it on a larger
 instance.
 
+### Do not turn SSE back on
+
+`json_response=True` is not a style choice. With the default SSE stream, roughly **58% of
+requests to the deployed service came back as a 404** while the container was provably
+healthy — health checks passing every five seconds throughout, and no log line for the
+failed requests at all. They were rejected at Render's edge with
+`x-render-routing: no-server`, so they never reached the container.
+
+Measured, same test either way: **5 of 12 requests succeeded with SSE, 25 of 25 without.**
+
+Streaming exists so a server can push notifications or progress during a call. Every tool
+here is a read-only query that answers exactly once, and the transport is stateless, so
+the stream carried nothing and cost most of the service's availability.
+
+## Verified against the live deployment
+
+| Check | Result |
+|---|---|
+| `/health` | `ok`, 1 123 games across 4 seasons |
+| `/` landing page | real URL substituted, no placeholder left |
+| MCP handshake | `euroleague-open-data v0.1.0`, protocol `2025-11-25` |
+| Tools / resources | 13 / 3 |
+| `get_draft_board` E2025, 8 teams, classic | Vezenkov 1st, 0.18 s |
+| `get_coach_rotation` | 35 coaches |
+| `run_sql` guardrail | refuses `DROP TABLE` |
+| Sustained burst | 25 of 25 requests OK |
+
 ## What has been verified locally
 
 The image is build-tested, not merely written. Against the running container:

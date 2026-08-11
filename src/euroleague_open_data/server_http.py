@@ -57,7 +57,16 @@ def _public_hosts() -> list[str]:
     comma-separated list so a Space can also be reached through a custom domain.
     """
     raw = os.environ.get("PUBLIC_HOST", "")
-    return [h.strip() for h in raw.split(",") if h.strip()]
+    hosts = [h.strip() for h in raw.split(",") if h.strip()]
+
+    # Platforms that announce the hostname they assigned save the operator from having to
+    # copy it into a variable by hand -- the step whose omission produces a blanket 421
+    # that looks like an outage. Explicit config still wins.
+    for var in ("RENDER_EXTERNAL_HOSTNAME", "KOYEB_PUBLIC_DOMAIN", "SPACE_HOST"):
+        assigned = os.environ.get(var, "").strip()
+        if assigned and assigned not in hosts:
+            hosts.append(assigned)
+    return hosts
 
 
 async def landing(request: Request) -> Response:

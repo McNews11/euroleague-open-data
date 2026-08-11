@@ -5,14 +5,22 @@ description = "Open EuroLeague/EuroCup basketball warehouse and MCP server. Unof
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
+# Serving and crawling are separate jobs with separate weight. The deployed image only
+# ever reads a DuckDB file and answers HTTP, so the crawler's dependencies -- polars,
+# pyarrow, httpx -- would be several hundred megabytes of nothing, paid for on every cold
+# start. Install `.[etl]` to build a warehouse; plain `.` to serve one.
 dependencies = [
-    "httpx>=0.27",
     "duckdb>=1.1",
-    "polars>=1.0",
-    "pyarrow>=17",
     "mcp[cli]>=1.2",
     "uvicorn>=0.30",
     "starlette>=0.37",
+]
+
+[project.optional-dependencies]
+etl = [
+    "httpx>=0.27",
+    "polars>=1.0",
+    "pyarrow>=17",
 ]
 
 [project.scripts]

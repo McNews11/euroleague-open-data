@@ -1,0 +1,19 @@
+# Render Blueprint. Point Render at this repo and the service comes up configured,
+# instead of depending on someone remembering to switch the instance type off the paid
+# default and to set a health check path.
+#
+# PUBLIC_HOST is deliberately absent: Render injects RENDER_EXTERNAL_HOSTNAME, and the
+# server reads it. Forgetting to copy the hostname into a variable by hand is the failure
+# that returns a bare 421 on every request and looks exactly like the service being down.
+services:
+  - type: web
+    name: euroleague-open-data
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      # The free instance has 512 MB, and an OOM kill takes down the container for
+      # everyone rather than failing the one query that asked for too much.
+      - key: DUCKDB_MEMORY_LIMIT
+        value: 256MB

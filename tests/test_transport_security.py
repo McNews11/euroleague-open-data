@@ -63,6 +63,24 @@ def test_multiple_public_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
     assert matcher._validate_host(SPACE)
 
 
+def test_platform_assigned_hostname_is_picked_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Render announces its own hostname; not using it is a self-inflicted 421."""
+    monkeypatch.delenv("PUBLIC_HOST", raising=False)
+    monkeypatch.setenv("RENDER_EXTERNAL_HOSTNAME", "euroleague.onrender.com")
+    from euroleague_open_data.server_http import _public_hosts
+
+    assert _public_hosts() == ["euroleague.onrender.com"]
+    assert _matcher(_public_hosts(), monkeypatch)._validate_host("euroleague.onrender.com")
+
+
+def test_explicit_config_and_platform_hostname_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PUBLIC_HOST", "custom.example.org")
+    monkeypatch.setenv("RENDER_EXTERNAL_HOSTNAME", "euroleague.onrender.com")
+    from euroleague_open_data.server_http import _public_hosts
+
+    assert _public_hosts() == ["custom.example.org", "euroleague.onrender.com"]
+
+
 def test_escape_hatch_disables_the_check(monkeypatch: pytest.MonkeyPatch) -> None:
     """A locked-out deployment must be recoverable with one variable, not a rebuild."""
     monkeypatch.setenv("DISABLE_HOST_CHECK", "1")

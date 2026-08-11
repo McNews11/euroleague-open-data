@@ -14,6 +14,16 @@ programmatic access, and no data licence.
 Euroleague Basketball is credited as the origin of the underlying data on every export
 this project produces.
 
+## A second origin: the NBA
+
+Some rows in `nba_player_season` originate from **NBA Properties, Inc.**, retrieved from
+`stats.nba.com` through the third-party `nba_api` package. That endpoint is likewise
+undocumented and carries no public licence for programmatic access. It is used only to
+give a reference point for players who arrive in Europe with no record in this
+competition, is fetched at build time rather than per request, and is always labelled as
+NBA-derived so it is never mistaken for a EuroLeague figure. The takedown path below
+applies to it equally.
+
 ## Purpose and scope
 
 This project exists for **research and educational use**. It is a re-organisation of

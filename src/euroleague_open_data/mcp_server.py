@@ -26,7 +26,7 @@ import duckdb
 # the future HTTP deployment will use.
 from mcp.server.mcpserver import MCPServer
 
-from . import rosters
+from . import nba, rosters
 
 log = logging.getLogger(__name__)
 
@@ -412,6 +412,7 @@ def get_draft_board(
     next_season: str = "E2026",
     adjust_for_minutes: bool = True,
     second_tier: str = "U2025",
+    nba_season: str = "2025-26",
 ) -> dict[str, Any]:
     """Rank players for a BasketNews Fantasy DRAFT by value over replacement.
 
@@ -547,6 +548,31 @@ def get_draft_board(
         LEFT JOIN ({rosters.PRESSURE_SQL}) pr2 USING (person_code)
         """
         params += [next_season, season]
+        params += rosters.pressure_params(season, next_season)
+
+    if nba_season:
+        # Lowest priority: only players with no European history at all. Same shape, same
+        # pressure penalty, and the source says NBA so nothing reads like a EuroLeague
+        # figure. Calibrated on 16 movers, r = +0.62 -- real, and thin.
+        sql += f"""
+        UNION ALL
+        SELECT NULL AS raw_rank, s.player_name, s.position, NULL AS team_code,
+               s.games_played, NULL AS minutes_per_game, s.value_per_game,
+               s.value_source,
+               NULL AS vorp_per_game, NULL AS consistency_ratio,
+               s.next_team, s.next_position, pr3.minute_pressure,
+               CASE WHEN pr3.minute_pressure >= {rosters.PRESSURE_HIGH} THEN 'high'
+                    WHEN pr3.minute_pressure <= {rosters.PRESSURE_LOW} THEN 'low'
+                    ELSE 'normal' END AS pressure_band,
+               round(s.value_per_game - CASE WHEN pr3.minute_pressure >= {rosters.PRESSURE_HIGH}
+                                             THEN {rosters.PRESSURE_PENALTY} ELSE 0 END, 2)
+                   AS adjusted_per_game
+        FROM ({nba.NBA_FALLBACK_SQL}) s
+        LEFT JOIN (SELECT DISTINCT next_team, next_position, minute_pressure
+                   FROM ({rosters.PRESSURE_SQL})) pr3
+               ON pr3.next_team = s.next_team AND pr3.next_position = s.next_position
+        """
+        params += [next_season, nba_season, nba_season, nba_season]
         params += rosters.pressure_params(season, next_season)
 
     sql = f"SELECT * FROM ({sql})"

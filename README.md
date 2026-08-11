@@ -163,7 +163,7 @@ Two things about scoring are worth knowing before you trust a late-round pick:
 | `get_game_boxscore` | full game detail with completeness flags |
 | `get_shot_chart` | zone aggregates, optionally raw x/y coordinates |
 | `run_sql` | read-only DuckDB SELECT — the escape hatch for unanticipated questions |
-| `get_draft_board` | draft ranking by value over replacement, sized to your league, adjusted for minute pressure at the player's 2026-27 club |
+| `get_draft_board` | draft ranking by value over replacement, sized to your league, adjusted for minute pressure, with EuroCup and NBA arrivals converted and labelled |
 | `plan_snake_draft` | your picks in snake order, and who should survive until each |
 | `compare_draft_candidates` | head to head for a specific pick decision |
 | `get_player_fantasy_log` | game-by-game fantasy points, for form and role changes |

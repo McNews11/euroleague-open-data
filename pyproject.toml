@@ -21,6 +21,7 @@ etl = [
     "httpx>=0.27",
     "polars>=1.0",
     "pyarrow>=17",
+    "nba_api>=1.4",
 ]
 
 [project.scripts]
@@ -28,6 +29,7 @@ euroleague-etl = "euroleague_open_data.cli:main"
 euroleague-mcp = "euroleague_open_data.mcp_server:main"
 euroleague-mcp-http = "euroleague_open_data.server_http:main"
 euroleague-overrides = "euroleague_open_data.overrides:main"
+euroleague-nba = "euroleague_open_data.nba:main"
 
 [dependency-groups]
 dev = [

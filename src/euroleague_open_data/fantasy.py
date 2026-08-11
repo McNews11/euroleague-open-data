@@ -11,7 +11,18 @@ ASSUMPTIONS, flagged because the rules page does not settle them:
 
 1. "Classic" scoring is described only as "traditional scoring based on player statistics".
    The budget-mode page gives an explicit formula -- PIR +/-10% by team result -- so that
-   is what CLASSIC implements. Confirm with your league commissioner.
+   is what CLASSIC implements.
+
+   PARTIALLY CONFIRMED against the live site on 2026-08-11. Vezenkov, E2025 round 1:
+   PIR 27 in a win, scored 29.7 there, and 27 * 1.1 = 29.7 here. An exact match on a
+   specific value, so the PIR base and the 1.1 win multiplier are settled.
+
+   The 0.9 LOSS multiplier is still unconfirmed -- round 1 was a win, so that check could
+   not distinguish it. Measured rather than worried about: rebuilding the E2025 board with
+   a 1.0 loss multiplier instead moves nothing that matters. Rank correlation 0.9996 over
+   247 players with 20+ games, the top 7 unchanged, average move 1.4 places, and only 7
+   players move 5 places or more. So this is left as-is deliberately. If you want it
+   settled anyway, the test is Vezenkov E2025 round 2: PIR 16 in a loss, predicted 14.4.
 2. Double/triple/quadruple-double bonuses are awarded at the highest tier reached only,
    not cumulatively. Flip STACK_DOUBLE_BONUSES to change it.
 3. A player who did not play scores zero, including no win/loss bonus. Awarding +1.5 to a

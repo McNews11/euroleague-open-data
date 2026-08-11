@@ -140,10 +140,12 @@ uv run python -m euroleague_open_data.fantasy --teams 8 --scoring classic
 
 Two things about scoring are worth knowing before you trust a late-round pick:
 
-1. **The "classic" formula is not published for draft mode.** The rules page describes it
-   only as "traditional scoring based on player statistics". Budget mode gives an explicit
-   formula — PIR ±10% by team result — and that is what `classic` implements here. It is an
-   assumption, and it is marked as one in `fantasy.py`.
+1. **The "classic" formula is not published for draft mode**, so it was reverse-checked
+   against the live site. Vezenkov, E2025 round 1: PIR 27 in a win scores 29.7 there, and
+   27 × 1.1 = 29.7 here. The PIR base and the win multiplier are confirmed. The loss
+   multiplier is still inferred — and measured to be immaterial: rebuilding the board with
+   1.0 instead of 0.9 gives rank correlation 0.9996, an unchanged top 7, and an average
+   move of 1.4 places.
 2. **It matters less than it looks.** Rank correlation between classic and modern is 0.99
    and seven of the top eight are the same players. The disagreement shows up in the
    middle: one player moves 94th to 61st, which in an 8×13 draft is a different round.

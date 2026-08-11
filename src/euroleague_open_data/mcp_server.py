@@ -811,6 +811,124 @@ def get_transfers(
     return result
 
 
+@mcp.tool()
+def get_squad_outlook(
+    team_code: str,
+    season: str = "E2026",
+    previous_season: str = "E2025",
+) -> dict[str, Any]:
+    """A club's announced squad for the coming season: who left, who arrived, what is open.
+
+    Use this, not get_role_outlook, for anything about the season ahead. get_role_outlook
+    compares two seasons that were both played, so before a ball is thrown up it describes
+    LAST summer's departures -- a whole transfer window out of date.
+
+    Read the minute budget, not the names. Each position has roughly the same minutes to
+    give as last season, so when the arrivals' previous workloads add up to more than the
+    club has, somebody's minutes fall. That is the mechanism behind a good player scoring
+    less at a new club: among players who changed club last summer, the ones who dropped
+    were the ones who lost minutes, not simply the ones who moved.
+
+    `status` is the important column:
+      returning               - was at this club last season
+      arrived                 - came from another club in this competition, numbers apply
+                                to his OLD role, not the new one
+      no_history_in_warehouse - has a person code but no rows here. Valanciunas returning
+                                to Zalgiris from the NBA is this: he played in 2011-13,
+                                which is not loaded.
+      new_to_competition      - no code at all, typically an NBA or domestic-league arrival
+
+    For the last two, this warehouse can tell you the ROLE and nothing about the PLAYER.
+    State the opening he walks into -- minutes and production the club lost at his position,
+    who he competes with -- and say plainly that his own level is an input you do not have.
+    Do not invent a projection, and never let a missing number read as zero.
+
+    Args:
+        team_code: club code from search_teams.
+        season: the upcoming season, e.g. "E2026".
+        previous_season: the last played season, e.g. "E2025".
+    """
+    loaded = _query(
+        "SELECT count(*) AS n FROM announced_rosters WHERE season_code = ? AND team_code = ?",
+        [season, team_code],
+    )
+    rows = loaded.get("rows") or []
+    if not rows or not rows[0].get("n"):
+        return {
+            "error": f"No announced roster for {team_code} in {season}.",
+            "how_to_fix": (
+                f"Run: uv run python -m euroleague_open_data.rosters --season {season}. "
+                "This is 'not loaded', not 'the club has no players'."
+            ),
+        }
+
+    gone = _query(
+        rosters.DEPARTURES_SQL,
+        [previous_season, previous_season, previous_season, team_code, season, team_code],
+    )
+    squad = _query(
+        rosters.SQUAD_SQL,
+        [previous_season, previous_season, previous_season, season, team_code],
+    )
+    coach = _query(
+        """SELECT coach_name, games_coached, avg_players_15plus, rotation_style
+           FROM coach_rotation_profile WHERE team_code = ? AND season_code = ?
+           ORDER BY games_coached DESC""",
+        [team_code, previous_season],
+    )
+
+    # A failed query must not arrive as an empty section. `_query` returns {"error": ...}
+    # rather than raising, so reading .get("rows") straight through turns a broken SQL
+    # statement into "this club lost nobody" -- which is exactly how a missing alias in
+    # DEPARTURES_SQL once reported Zalgiris as having kept Francisco and Wright.
+    for name, result in (("departures", gone), ("squad", squad)):
+        if "error" in result:
+            return {
+                "error": f"the {name} query failed: {result['error']}",
+                "note": "This is a failure, not an empty result. Do not report it as no changes.",
+            }
+
+    departed = gone.get("rows") or []
+    members = squad.get("rows") or []
+
+    # The minute budget, per position. Last season's total is the size of the pot; the
+    # arrivals' previous minutes are what they are used to being paid out of it.
+    budget: dict[str, dict[str, float]] = {}
+    for row in departed:
+        pos = row.get("position") or "Unknown"
+        b = budget.setdefault(pos, {"freed_minutes_per_game": 0.0, "claimed_by_squad": 0.0})
+        b["freed_minutes_per_game"] += row.get("minutes_per_game") or 0.0
+    for row in members:
+        pos = row.get("position") or "Unknown"
+        b = budget.setdefault(pos, {"freed_minutes_per_game": 0.0, "claimed_by_squad": 0.0})
+        b["claimed_by_squad"] += row.get("minutes_per_game") or 0.0
+    for b in budget.values():
+        b["freed_minutes_per_game"] = round(b["freed_minutes_per_game"], 1)
+        b["claimed_by_squad"] = round(b["claimed_by_squad"], 1)
+
+    unknown = [r for r in members if r.get("status") in
+               ("no_history_in_warehouse", "new_to_competition")]
+
+    return {
+        "departed": departed,
+        "squad": members,
+        "minute_budget_by_position": budget,
+        "coaching_last_season": coach.get("rows"),
+        "players_without_history": [r["player_name"] for r in unknown],
+        "how_to_read_the_budget": (
+            "claimed_by_squad sums what each announced player played LAST season, at his "
+            "old club. A position where that total exceeds roughly the minutes the club "
+            "actually has (about 200 across the five spots) is oversubscribed: those "
+            "players cannot all keep their previous workload."
+        ),
+        "caveat": (
+            f"{len(unknown)} players in this squad have no rows in this warehouse. No "
+            "projection is possible for them from this data -- describe the role they are "
+            "walking into and say their own level is unknown here."
+        ),
+    }
+
+
 # ------------------------------------------------------------------------ resources
 
 

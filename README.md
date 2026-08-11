@@ -31,7 +31,7 @@ announced 2026-27 EuroLeague squads, so the draft tools work before a game has b
 | DuckDB warehouse, 8 base tables | working |
 | Validation suite, 8 reconciliation checks | working |
 | Derived analytics (TS%, eFG%, usage, Four Factors, shot zones) | working |
-| MCP server, stdio transport, 14 tools + 3 resources | working |
+| MCP server, stdio transport, 15 tools + 3 resources | working |
 | HTTP transport + landing page, Docker image build-tested | working |
 | Public deployment on Render (free instance, sleeps when idle) | live |
 | Full backfill (52 seasons, 12 122 games) | not started, ~50h of crawling |
@@ -170,6 +170,7 @@ Two things about scoring are worth knowing before you trust a late-round pick:
 | `get_coach_rotation` | how deep a coach's rotation runs — the ceiling on minutes |
 | `get_role_outlook` | minutes and production a club vacated, by position |
 | `get_transfers` | announced 2026-27 squads: who moved, who stayed, who is unsigned |
+| `get_squad_outlook` | a club's coming season: minutes freed, minutes claimed, who has no history |
 
 Resources: `euroleague://schema`, `euroleague://coverage`, `euroleague://data-quality`.
 

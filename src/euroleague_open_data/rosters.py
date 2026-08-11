@@ -71,7 +71,9 @@ def fetch_rosters(client: ThrottledClient, comp: str, season: str) -> list[dict[
                     "position": entry.get("positionName"),
                     "dorsal": (entry.get("dorsal") or "").strip() or None,
                     "contract_until": (entry.get("endDate") or "")[:10] or None,
-                    "known_to_warehouse": bool(person_code),
+                    # Named for what it is. A code is not history: Valanciunas carries one
+                    # from 2011-13 while this warehouse holds no row for him.
+                    "has_person_code": bool(person_code),
                 }
             )
             signed += 1
@@ -85,7 +87,7 @@ def load(con: duckdb.DuckDBPyConnection, rows: list[dict[str, Any]]) -> None:
         CREATE TABLE IF NOT EXISTS announced_rosters (
             season_code VARCHAR, team_code VARCHAR, team_name VARCHAR,
             person_code VARCHAR, player_name VARCHAR, position VARCHAR,
-            dorsal VARCHAR, contract_until VARCHAR, known_to_warehouse BOOLEAN
+            dorsal VARCHAR, contract_until VARCHAR, has_person_code BOOLEAN
         )
         """
     )
@@ -98,7 +100,7 @@ def load(con: duckdb.DuckDBPyConnection, rows: list[dict[str, Any]]) -> None:
         [
             [r["season_code"], r["team_code"], r["team_name"], r["person_code"],
              r["player_name"], r["position"], r["dorsal"], r["contract_until"],
-             r["known_to_warehouse"]]
+             r["has_person_code"]]
             for r in rows
         ],
     )
@@ -149,6 +151,81 @@ SELECT n.player_name, n.position,
 FROM now n
 LEFT JOIN before b USING (person_code)
 LEFT JOIN form f ON f.person_code = n.person_code
+"""
+
+# What a club lost for the UPCOMING season, by position.
+#
+# The vacated_role table compares two seasons that were both played, so before a ball is
+# thrown up it describes last summer, not this one -- reading it as "minutes free at
+# Zalgiris now" is wrong by a whole transfer window. This compares the announced roster
+# against the last played season instead.
+DEPARTURES_SQL = """
+WITH last_spell AS (
+    SELECT person_code, team_code, position_name FROM (
+        SELECT s.person_code, s.team_code, s.position_name,
+               row_number() OVER (PARTITION BY s.person_code
+                                  ORDER BY s.start_date DESC) AS rn
+        FROM player_team_spells s WHERE s.season_code = ?
+    ) WHERE rn = 1
+),
+form AS (
+    SELECT person_code, avg(fantasy_classic) AS classic, count(*) AS games
+    FROM fantasy_points_game WHERE season_code = ? GROUP BY 1
+),
+mins AS (
+    SELECT person_code, minutes / nullif(games_played, 0) AS mpg, usage_pct
+    FROM player_season_stats WHERE season_code = ?
+)
+SELECT l.position_name AS position, p.name AS player_name,
+       round(m.mpg, 1) AS minutes_per_game, m.usage_pct,
+       round(f.classic, 2) AS classic_per_game, f.games AS games_played
+FROM last_spell l
+JOIN players p USING (person_code)
+LEFT JOIN form f USING (person_code)
+LEFT JOIN mins m USING (person_code)
+WHERE l.team_code = ?
+  AND l.person_code NOT IN (
+      SELECT person_code FROM announced_rosters
+      WHERE season_code = ? AND team_code = ? AND person_code <> ''
+  )
+ORDER BY m.mpg DESC NULLS LAST
+"""
+
+# The announced squad, with each player's last-season workload where one exists.
+#
+# A null is the honest answer here, not a gap to fill. Valanciunas returns to Zalgiris
+# carrying a person code from 2011-13 and zero rows in this warehouse; an NBA arrival has
+# neither. Both must read as "no basis for a number", never as zero.
+SQUAD_SQL = """
+WITH prev AS (
+    SELECT person_code, team_code FROM (
+        SELECT person_code, team_code,
+               row_number() OVER (PARTITION BY person_code
+                                  ORDER BY start_date DESC) AS rn
+        FROM player_team_spells WHERE season_code = ?
+    ) WHERE rn = 1
+),
+form AS (
+    SELECT person_code, avg(fantasy_classic) AS classic, count(*) AS games
+    FROM fantasy_points_game WHERE season_code = ? GROUP BY 1
+),
+mins AS (
+    SELECT person_code, minutes / nullif(games_played, 0) AS mpg, usage_pct
+    FROM player_season_stats WHERE season_code = ?
+)
+SELECT a.player_name, a.position, a.dorsal,
+       round(m.mpg, 1) AS minutes_per_game, m.usage_pct,
+       round(f.classic, 2) AS classic_per_game, f.games AS games_played,
+       CASE WHEN a.person_code = '' THEN 'new_to_competition'
+            WHEN f.games IS NULL THEN 'no_history_in_warehouse'
+            WHEN pr.team_code = a.team_code THEN 'returning'
+            ELSE 'arrived' END AS status
+FROM announced_rosters a
+LEFT JOIN prev pr ON pr.person_code = a.person_code
+LEFT JOIN form f ON f.person_code = a.person_code
+LEFT JOIN mins m ON m.person_code = a.person_code
+WHERE a.season_code = ? AND a.team_code = ?
+ORDER BY m.mpg DESC NULLS LAST
 """
 
 # Players from last season who appear on no announced roster. They may still sign, so this

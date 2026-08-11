@@ -37,6 +37,93 @@ log = logging.getLogger(__name__)
 
 PLAYER_TYPE = "J"  # 'J' = player; coaches and staff share the endpoint
 
+# Minute pressure: what a club's announced squad is used to playing at a position, over
+# what the club actually gave that position last season. Above 1 is normal -- squads always
+# carry more nominal minutes than a game has -- so only the league-relative level means
+# anything. Across the 57 club x position pairs for 2026-27 the median is 1.11 and the
+# terciles fall at 0.89 and 1.25.
+#
+# Backtested before being trusted, by building the same ratio from E2024 rosters and
+# checking it against what actually happened in E2025 (n=149):
+#
+#     pressure <= 0.89   mean change +1.23   declined 8/30  (27%)
+#     0.89 - 1.25        mean change +1.41   declined 14/38 (37%)
+#     pressure >= 1.25   mean change -1.50   declined 57/81 (70%)
+#
+# Correlation -0.28: real but weak. The gap between the outer terciles is ~2.8 classic
+# points, which is the whole size of the effect and therefore the whole size of the
+# penalty. It is applied as a flat step rather than a curve because one season pair does
+# not support fitting one, and a smooth function would imply precision that is not there.
+PRESSURE_HIGH = 1.25
+PRESSURE_LOW = 0.89
+PRESSURE_PENALTY = 2.8
+
+# Minutes each club actually gave each position last season, and what the announced squad
+# would want if everyone kept their previous workload.
+PRESSURE_SQL = """
+WITH last_spell AS (
+    SELECT person_code, team_code, position_name FROM (
+        SELECT s.person_code, s.team_code, s.position_name,
+               row_number() OVER (PARTITION BY s.person_code
+                                  ORDER BY s.start_date DESC) AS rn
+        FROM player_team_spells s WHERE s.season_code = ?
+    ) WHERE rn = 1
+),
+-- Per-game minutes at a position = the club's total minutes there divided by the games
+-- the CLUB actually played. Not max(games_played) of any one player, who may have missed
+-- half the season, and not a constant: a EuroLeague season is 34-42 games depending on
+-- playoff run, and EuroCup is shorter still.
+club_games AS (
+    SELECT team_code, count(DISTINCT game_code) AS played FROM (
+        SELECT home_team_code AS team_code, game_code FROM games WHERE season_code = ?
+        UNION ALL
+        SELECT away_team_code AS team_code, game_code FROM games WHERE season_code = ?
+    ) GROUP BY 1
+),
+pot AS (
+    SELECT l.team_code, l.position_name AS position,
+           sum(st.minutes) / nullif(max(g.played), 0) AS pot_minutes
+    FROM last_spell l
+    JOIN player_season_stats st
+      ON st.person_code = l.person_code AND st.season_code = ?
+    LEFT JOIN club_games g ON g.team_code = l.team_code
+    GROUP BY 1, 2
+),
+claim AS (
+    SELECT a.team_code, a.position,
+           sum(coalesce(st.minutes / nullif(st.games_played, 0), 0)) AS claimed
+    FROM announced_rosters a
+    LEFT JOIN player_season_stats st
+      ON st.person_code = a.person_code AND st.season_code = ?
+    WHERE a.season_code = ?
+    GROUP BY 1, 2
+)
+SELECT a.person_code, a.team_name AS next_team, a.position AS next_position,
+       round(c.claimed / nullif(p.pot_minutes, 0), 2) AS minute_pressure
+FROM announced_rosters a
+LEFT JOIN claim c ON c.team_code = a.team_code AND c.position = a.position
+LEFT JOIN pot   p ON p.team_code = a.team_code AND p.position = a.position
+WHERE a.season_code = ? AND a.person_code <> ''
+"""
+
+
+def pressure_params(previous_season: str, next_season: str) -> list[str]:
+    """Bind values for PRESSURE_SQL, in order.
+
+    Kept next to the query on purpose: the placeholders and their arguments have to change
+    together, and counting `?` by eye at the call site is how a working board turned into
+    "Values were not provided for prepared statement parameter 10".
+    """
+    return [
+        previous_season,  # last_spell
+        previous_season,  # club_games, home leg
+        previous_season,  # club_games, away leg
+        previous_season,  # pot
+        previous_season,  # claim, player stats
+        next_season,      # claim, announced roster
+        next_season,      # outer select
+    ]
+
 
 def fetch_rosters(client: ThrottledClient, comp: str, season: str) -> list[dict[str, Any]]:
     """Every club's announced squad for `season`, one request per club."""
@@ -91,6 +178,16 @@ def load(con: duckdb.DuckDBPyConnection, rows: list[dict[str, Any]]) -> None:
         )
         """
     )
+    # CREATE TABLE IF NOT EXISTS does not alter an existing table, so a warehouse built
+    # before the rename keeps the old column while the code refers to the new one. Silent
+    # today because no query reads the flag; a trap the next time one does.
+    columns = {r[1] for r in con.execute("PRAGMA table_info('announced_rosters')").fetchall()}
+    if "known_to_warehouse" in columns and "has_person_code" not in columns:
+        con.execute(
+            "ALTER TABLE announced_rosters RENAME COLUMN known_to_warehouse TO has_person_code"
+        )
+        log.info("migrated announced_rosters.known_to_warehouse -> has_person_code")
+
     if not rows:
         return
     season = rows[0]["season_code"]

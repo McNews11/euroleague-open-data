@@ -409,6 +409,8 @@ def get_draft_board(
     min_games: int = 5,
     limit: int = 40,
     scoring: str = "classic",
+    next_season: str = "E2026",
+    adjust_for_minutes: bool = True,
 ) -> dict[str, Any]:
     """Rank players for a BasketNews Fantasy DRAFT by value over replacement.
 
@@ -418,7 +420,22 @@ def get_draft_board(
     SAME position who will still be available. That is `vorp_per_game`, and it is the
     correct sort order.
 
-    Scoring is the BasketNews modern system, recomputed exactly from boxscores.
+    Scoring is recomputed exactly from boxscores.
+
+    Two things make last season's ranking misleading in August, and both are corrected
+    when `next_season` has announced rosters loaded.
+
+    Players with no club yet are removed. Six of them sat inside the naive top 60 --
+    Angola 14th, Lyles 23rd, Mirotic, Hezonja, Osman. They are undraftable, and anyone
+    ranking on last season's numbers will burn picks on them.
+
+    `minute_pressure` is what the club's announced squad is used to playing at that
+    position over what the club actually gave it last season. High pressure means the
+    player has to win minutes he did not have to win before -- which is the mechanism
+    behind a good player scoring less at a new club. Backtested E2024->E2025 (n=149):
+    70% of high-pressure players declined against 27% of low-pressure ones, correlation
+    -0.28. Real, but weak: treat fifty places as signal and ten as noise, and never
+    present the adjusted number as a forecast.
 
     Fields worth reasoning about:
       vorp_per_game     - value over replacement. The draft ranking.
@@ -436,6 +453,10 @@ def get_draft_board(
         position: optional filter, "Guard", "Forward" or "Center".
         min_games: exclude players below this many appearances.
         limit: rows to return.
+        next_season: season being drafted. When its announced rosters are loaded, the
+            board is restricted to players who actually have a club and each one carries
+            the minute pressure at his new position. Pass "" to rank on last season alone.
+        adjust_for_minutes: sort by the pressure-adjusted value rather than raw VORP.
     """
     from .fantasy import draft_board_select
 
@@ -443,24 +464,86 @@ def get_draft_board(
         return {"error": "BasketNews draft leagues have between 3 and 12 teams"}
 
     inner = draft_board_select(teams, roster_size, scoring)
+    value = "classic_per_game" if scoring == "classic" else "modern_per_game"
+
+    have_rosters = False
+    if next_season:
+        check = _query(
+            "SELECT count(*) AS n FROM announced_rosters WHERE season_code = ?",
+            [next_season],
+        )
+        rows = check.get("rows") or []
+        have_rosters = bool(rows and rows[0].get("n"))
+
+    if not have_rosters:
+        sql = f"""
+            SELECT overall_rank, pos_rank, player_name, position, team_code, games_played,
+                   minutes_per_game, modern_per_game, modern_floor_p25, modern_ceiling_p75,
+                   consistency_ratio, double_doubles, replacement_level, vorp_per_game,
+                   vorp_total, classic_per_game
+            FROM ({inner}) board
+            WHERE season_code = ? AND games_played >= ?
+        """
+        params: list[Any] = [season, min_games]
+        if position:
+            sql += " AND lower(position) = lower(?)"
+            params.append(position)
+        sql += " ORDER BY vorp_per_game DESC LIMIT ?"
+        params.append(min(limit, MAX_ROWS))
+        result = _query(sql, params)
+        result["scoring_system"] = f"BasketNews {scoring} (draft mode)"
+        result["league"] = {"teams": teams, "roster_size": roster_size}
+        if next_season:
+            result["minute_pressure"] = (
+                f"not applied: no announced rosters loaded for {next_season}. This is "
+                "'unknown', not 'no competition for minutes'."
+            )
+        return result
+
     sql = f"""
-        SELECT overall_rank, pos_rank, player_name, position, team_code, games_played,
-               minutes_per_game, modern_per_game, modern_floor_p25, modern_ceiling_p75,
-               consistency_ratio, double_doubles, replacement_level, vorp_per_game,
-               vorp_total, classic_per_game
-        FROM ({inner}) board
-        WHERE season_code = ? AND games_played >= ?
+        WITH board AS (SELECT * FROM ({inner}) b WHERE b.season_code = ?),
+        pressure AS ({rosters.PRESSURE_SQL})
+        SELECT b.overall_rank AS raw_rank, b.player_name, b.position, b.team_code,
+               b.games_played, b.minutes_per_game, b.{value} AS value_per_game,
+               b.vorp_per_game, b.consistency_ratio,
+               pr.next_team, pr.next_position, pr.minute_pressure,
+               CASE WHEN pr.minute_pressure >= {rosters.PRESSURE_HIGH} THEN 'high'
+                    WHEN pr.minute_pressure <= {rosters.PRESSURE_LOW} THEN 'low'
+                    ELSE 'normal' END AS pressure_band,
+               round(b.{value} - CASE WHEN pr.minute_pressure >= {rosters.PRESSURE_HIGH}
+                                      THEN {rosters.PRESSURE_PENALTY} ELSE 0 END, 2)
+                   AS adjusted_per_game
+        FROM board b
+        JOIN pressure pr USING (person_code)
+        WHERE b.games_played >= ?
     """
-    params: list[Any] = [season, min_games]
+    params = [season, *rosters.pressure_params(season, next_season), min_games]
     if position:
-        sql += " AND lower(position) = lower(?)"
+        sql += " AND lower(b.position) = lower(?)"
         params.append(position)
-    sql += " ORDER BY vorp_per_game DESC LIMIT ?"
+    sql += (
+        f" ORDER BY {'adjusted_per_game' if adjust_for_minutes else 'b.vorp_per_game'}"
+        " DESC LIMIT ?"
+    )
     params.append(min(limit, MAX_ROWS))
 
     result = _query(sql, params)
     result["scoring_system"] = f"BasketNews {scoring} (draft mode)"
     result["league"] = {"teams": teams, "roster_size": roster_size}
+    result["filtered_to"] = (
+        f"players on an announced {next_season} roster. Anyone still unsigned is absent "
+        "from this list -- use get_transfers(status='unsigned') to see them."
+    )
+    result["minute_pressure"] = {
+        "definition": "squad's previous workload at that position / minutes the club "
+                      "actually gave that position last season",
+        "bands": f"low <= {rosters.PRESSURE_LOW}, high >= {rosters.PRESSURE_HIGH}, "
+                 "league median 1.11",
+        "penalty_applied": rosters.PRESSURE_PENALTY if adjust_for_minutes else 0,
+        "evidence": "backtested E2024->E2025, n=149: 70% of high-pressure players "
+                    "declined against 27% of low-pressure ones, correlation -0.28",
+        "caution": "weak signal. Ten places apart on this board is noise; fifty is not.",
+    }
     return result
 
 

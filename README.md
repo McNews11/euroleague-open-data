@@ -31,18 +31,23 @@ Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025.
 | Validation suite, 8 reconciliation checks | working |
 | Derived analytics (TS%, eFG%, usage, Four Factors, shot zones) | working |
 | MCP server, stdio transport, 13 tools + 3 resources | working |
-| HTTP transport + landing page, Docker image build-tested | working, not yet deployed |
+| HTTP transport + landing page, Docker image build-tested | working |
+| Public deployment on Render (free instance, sleeps when idle) | live |
 | Full backfill (52 seasons, 12 122 games) | not started, ~50h of crawling |
-| Hosting, dataset publishing to GitHub Releases | not started |
+| Dataset publishing to GitHub Releases / HuggingFace | not started |
 
 ## Quick start
 
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12+.
 
 ```bash
-git clone <this repo> && cd euroleague-open-data
-uv sync
+git clone https://github.com/McNews11/euroleague-open-data && cd euroleague-open-data
+uv sync --extra etl
 ```
+
+`--extra etl` pulls in the crawler's dependencies. Plain `uv sync` installs only what is
+needed to *serve* an existing warehouse, which is what the deployed image does — it keeps
+polars, pyarrow and httpx out of the container and halves its size.
 
 Build the warehouse. The crawl is deliberately slow — about two hours for one season —
 and it is safe to interrupt and rerun, because every response is cached permanently.
@@ -69,11 +74,16 @@ claude mcp add euroleague --env EUROLEAGUE_DB=$PWD/data/euroleague.duckdb -- $PW
 
 A hosted deployment serves the same tools over HTTPS, so anyone can connect by URL with
 nothing installed — and it is the **only** way to use this from ChatGPT, which cannot run
-local MCP servers. See [docs/DEPLOY.md](docs/DEPLOY.md).
+local MCP servers.
 
 ```bash
-claude mcp add --transport http euroleague https://<your-deployment>/mcp
+claude mcp add --transport http euroleague https://euroleague-open-data.onrender.com/mcp
 ```
+
+It runs on a free instance that sleeps after 15 minutes idle, so the first request after a
+quiet spell takes about a minute. Everything after it is fast. To host your own, see
+[docs/DEPLOY.md](docs/DEPLOY.md) — the landing page at `/` fills in whatever hostname it
+is served from, so a fork needs no edit.
 
 Note that ChatGPT custom connectors require a paid plan (Plus, Pro, Business, Enterprise
 or Edu) with Developer mode enabled. Claude Code and Claude Desktop work on any plan.

@@ -38,6 +38,16 @@ def read_file(path: Path) -> list[dict[str, str]]:
     for row in csv.DictReader(lines):
         if not (row.get("player") or "").strip():
             continue
+        # A note containing a comma splits into extra columns unless it is quoted, and
+        # DictReader drops the remainder into restkey without complaint -- so "retired
+        # after 2025-26 (Deividas, 2026-08-11)" silently became "retired after 2025-26
+        # (Deividas". Losing half a reason is the same class of quiet failure this file
+        # exists to prevent.
+        if row.get(None):
+            raise OverrideError(
+                f"{row['player']}: too many columns. A note containing a comma must be "
+                'quoted: "...,note with, commas"'
+            )
         status = (row.get("status") or "").strip().lower()
         if status not in VALID:
             raise OverrideError(

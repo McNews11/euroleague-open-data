@@ -90,3 +90,28 @@ def test_missing_file_is_not_an_error(con, tmp_path: Path) -> None:
     """No corrections is a legitimate state; the table is still created and emptied."""
     assert overrides.load(con, tmp_path / "nope.csv") == []
     assert con.execute("SELECT count(*) FROM player_overrides").fetchone()[0] == 0
+
+
+def test_an_unquoted_note_with_a_comma_raises(con, tmp_path: Path) -> None:
+    """Half a reason is worse than none, and DictReader loses it without complaint."""
+    p = tmp_path / "overrides.csv"
+    p.write_text(
+        "player,status,note\n"
+        '"DE COLO, NANDO",retired,retired after 2025-26, confirmed 2026-08-11\n',
+        encoding="utf-8",
+    )
+    con.execute("INSERT INTO players VALUES ('005', 'DE COLO, NANDO')")
+    with pytest.raises(overrides.OverrideError, match="too many columns"):
+        overrides.load(con, p)
+
+
+def test_a_quoted_note_with_a_comma_survives_intact(con, tmp_path: Path) -> None:
+    p = tmp_path / "overrides.csv"
+    p.write_text(
+        "player,status,note\n"
+        '"DE COLO, NANDO",retired,"retired after 2025-26; confirmed by Deividas, 2026-08-11"\n',
+        encoding="utf-8",
+    )
+    con.execute("INSERT INTO players VALUES ('005', 'DE COLO, NANDO')")
+    applied = overrides.load(con, p)
+    assert applied[0]["note"].endswith("2026-08-11")

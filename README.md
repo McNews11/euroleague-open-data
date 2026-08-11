@@ -177,6 +177,25 @@ Resources: `euroleague://schema`, `euroleague://coverage`, `euroleague://data-qu
 `run_sql` runs on a read-only connection, permits a single `SELECT`/`WITH`, caps rows, and
 cancels after 15 seconds.
 
+## Correcting what the data cannot know
+
+The API lists who is on a roster. It never says why someone is absent, so a player who
+signed in the NBA looks identical to one still negotiating — and the first should not
+appear on a draft board at all. [`data/overrides.csv`](data/overrides.csv) is where a
+human records the difference:
+
+```
+player,status,note
+"DIALLO, ALPHA",left_league,signed in the NBA after Monaco left the EuroLeague
+```
+
+```bash
+uv run euroleague-overrides
+```
+
+Rows that match no player, or match two, raise rather than being skipped — a correction
+that silently fails to apply is worse than none, because it looks like it worked.
+
 ## Data quality
 
 Validation runs as part of every ETL run and writes

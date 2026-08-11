@@ -516,6 +516,9 @@ def get_draft_board(
         FROM board b
         JOIN pressure pr USING (person_code)
         WHERE b.games_played >= ?
+          AND b.person_code NOT IN (
+              SELECT person_code FROM player_overrides WHERE status IN ('left_league',
+                     'retired', 'unavailable'))
     """
     params = [season, *rosters.pressure_params(season, next_season), min_games]
     if position:
@@ -859,12 +862,18 @@ def get_transfers(
 
     if status == "unsigned":
         out = _query(
-            rosters.UNSIGNED_SQL + " LIMIT ?",
+            """SELECT u.*, o.status AS known_status, o.note AS known_note
+               FROM (""" + rosters.UNSIGNED_SQL + """) u
+               LEFT JOIN player_overrides o ON o.player_name = u.player_name
+               ORDER BY u.classic_per_game DESC NULLS LAST LIMIT ?""",
             [previous_season, previous_season, season, limit],
         )
         out["meaning"] = (
             f"Played in {previous_season} and appears on no announced {season} roster. "
-            "They may still sign -- this is 'not currently listed', not 'left the league'."
+            "Upstream cannot say why: a player who signed in the NBA looks exactly like "
+            "one still negotiating. `known_status` is filled in only where a human "
+            "recorded the reason in data/overrides.csv; where it is null, absence means "
+            "nothing more than absence."
         )
         return out
 

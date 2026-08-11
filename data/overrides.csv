@@ -1,0 +1,21 @@
+# Things the upstream data cannot know.
+#
+# EuroLeague's API lists who IS on a roster. It says nothing about why someone is absent,
+# so a player who signed in the NBA, retired, or is simply still negotiating all look
+# identical: missing. Treating them alike puts players who are never coming back on a
+# draft board, which is worse than useless during a live draft.
+#
+# This file is where a human corrects that. It is committed, so the reasoning travels with
+# the repo and a wrong call can be found in the diff later.
+#
+# player  : any unambiguous part of the name. Loading fails loudly on no match or on
+#           several matches -- a silently skipped row is how a correction gets lost.
+# status  : left_league  - gone to the NBA or elsewhere; excluded from draft boards
+#           retired      - excluded
+#           unavailable  - injured or suspended for a meaningful stretch; excluded
+#           available    - explicitly still on the market, overrides nothing but is
+#                          useful for keeping notes
+# note    : why, and ideally where you read it. Future you will want the source.
+player,status,note
+"DIALLO, ALPHA",left_league,signed in the NBA after Monaco left the EuroLeague
+"WALKER IV, LONNIE",left_league,returned to the NBA

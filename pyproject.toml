@@ -27,6 +27,7 @@ etl = [
 euroleague-etl = "euroleague_open_data.cli:main"
 euroleague-mcp = "euroleague_open_data.mcp_server:main"
 euroleague-mcp-http = "euroleague_open_data.server_http:main"
+euroleague-overrides = "euroleague_open_data.overrides:main"
 
 [dependency-groups]
 dev = [

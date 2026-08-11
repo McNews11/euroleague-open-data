@@ -283,3 +283,24 @@ Stated so nobody mistakes silence for confirmation:
 - Whether `feeds.incrowdsports.com` has a separate rate-limit budget.
 - Kaggle seed dataset contents — the page is JavaScript-rendered and downloads require an
   authenticated Kaggle account.
+
+
+## 9. Announced rosters for an unplayed season
+
+Found 2026-08-11, and it contradicts the obvious reading of the API.
+
+`/v2/competitions/E/seasons/E2026/people` returns `total: 0`, which looks like "rosters are
+not published yet". They are. `/v2/competitions/E/seasons/E2026/clubs/{code}/people`
+returns full squads for all 20 clubs -- 301 players, 270 of them with person codes.
+
+The season-wide aggregate is empty while the per-club route is populated. Taking the
+aggregate at face value means reporting an absence of data as a fact about the world, which
+is the recurring failure mode in this project.
+
+Two shapes differ from the rest of the API:
+
+- the per-club route returns a bare JSON list, not the usual `{"data": [...]}` envelope;
+- `person.code` is `null` for players new to the competition (31 of 301 in E2026), so they
+  cannot be joined to history at all.
+
+Entries carry `type` -- `"J"` is a player; coaches and staff share the endpoint.

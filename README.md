@@ -22,7 +22,8 @@ to this project can generate load on Euroleague Basketball's infrastructure.
 
 ## Status
 
-Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025.
+Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025. Plus the
+announced 2026-27 EuroLeague squads, so the draft tools work before a game has been played.
 
 | Component | State |
 |---|---|
@@ -30,7 +31,7 @@ Four seasons loaded: EuroLeague E2024 and E2025, EuroCup U2024 and U2025.
 | DuckDB warehouse, 8 base tables | working |
 | Validation suite, 8 reconciliation checks | working |
 | Derived analytics (TS%, eFG%, usage, Four Factors, shot zones) | working |
-| MCP server, stdio transport, 13 tools + 3 resources | working |
+| MCP server, stdio transport, 14 tools + 3 resources | working |
 | HTTP transport + landing page, Docker image build-tested | working |
 | Public deployment on Render (free instance, sleeps when idle) | live |
 | Full backfill (52 seasons, 12 122 games) | not started, ~50h of crawling |
@@ -114,6 +115,7 @@ Compare Vezenkov and Nwora on efficiency and usage.
 Which team had the best defensive rating, and which Four Factor drove it?
 Show me Micic's shot chart by zone.
 Which games are unreliable for lineup analysis?
+Who changed clubs this summer, and which of them scored well last season?
 ```
 
 That last one matters. The warehouse tracks its own completeness, so the model can say
@@ -167,6 +169,7 @@ Two things about scoring are worth knowing before you trust a late-round pick:
 | `get_player_fantasy_log` | game-by-game fantasy points, for form and role changes |
 | `get_coach_rotation` | how deep a coach's rotation runs — the ceiling on minutes |
 | `get_role_outlook` | minutes and production a club vacated, by position |
+| `get_transfers` | announced 2026-27 squads: who moved, who stayed, who is unsigned |
 
 Resources: `euroleague://schema`, `euroleague://coverage`, `euroleague://data-quality`.
 

@@ -26,6 +26,8 @@ import duckdb
 # the future HTTP deployment will use.
 from mcp.server.mcpserver import MCPServer
 
+from . import rosters
+
 log = logging.getLogger(__name__)
 
 MAX_ROWS = 500
@@ -722,6 +724,90 @@ def get_role_outlook(team_code: str, season: str = "E2025") -> dict[str, Any]:
             "also be loaded. Say this plainly rather than reporting zero departures -- zero "
             "loaded seasons and zero departures are different facts."
         )
+    return result
+
+
+@mcp.tool()
+def get_transfers(
+    season: str = "E2026",
+    previous_season: str = "E2025",
+    team_code: str = "",
+    status: str = "moved",
+    min_classic: float = 0.0,
+    limit: int = 60,
+) -> dict[str, Any]:
+    """Where players actually are for an upcoming season, and who changed club.
+
+    This is the tool for drafting before a ball has been thrown up. Every other tool here
+    is built from games that have been played, so none of them know that a player signed
+    somewhere new in the summer. This one reads the clubs' announced squads.
+
+    Transfers are detected by comparing club CODES, never names. Sponsors change every
+    summer -- Maccabi Playtika became Maccabi Rapyd, EA7 Emporio Armani became Armani
+    Olimpia -- and matching on names reports an entire squad as transferred.
+
+    `classic_per_game` is the player's form at his OLD club last season. It is what he
+    did, not a projection of what he will do at the new one; pair it with get_role_outlook
+    to see the minutes he is walking into. Players marked `new_to_competition` have no
+    history in this warehouse at all, so no number is offered for them rather than a
+    fabricated one.
+
+    Args:
+        season: the upcoming season, e.g. "E2026".
+        previous_season: season to compare against, e.g. "E2025".
+        team_code: restrict to one club (arriving or leaving).
+        status: "moved", "stayed", "new_to_competition", "unsigned" or "all".
+        min_classic: only players who averaged at least this many classic points.
+        limit: max rows.
+    """
+    have = _query(
+        "SELECT count(*) AS n FROM announced_rosters WHERE season_code = ?", [season]
+    )
+    rows = have.get("rows") or []
+    if not rows or not rows[0].get("n"):
+        return {
+            "error": f"No announced rosters loaded for {season}.",
+            "how_to_fix": (
+                f"Run: uv run python -m euroleague_open_data.rosters --season {season}. "
+                "Report this as 'rosters not loaded', which is different from 'no player "
+                "changed club'."
+            ),
+        }
+
+    if status == "unsigned":
+        out = _query(
+            rosters.UNSIGNED_SQL + " LIMIT ?",
+            [previous_season, previous_season, season, limit],
+        )
+        out["meaning"] = (
+            f"Played in {previous_season} and appears on no announced {season} roster. "
+            "They may still sign -- this is 'not currently listed', not 'left the league'."
+        )
+        return out
+
+    # Filter over the finished projection rather than inside it, so the column names here
+    # are the ones the caller sees.
+    params: list[Any] = [season, previous_season, previous_season]
+    where: list[str] = []
+    if status != "all":
+        where.append("status = ?")
+        params.append(status)
+    if team_code:
+        where.append("(to_team_code = ? OR from_team_code = ?)")
+        params.extend([team_code, team_code])
+    if min_classic:
+        where.append("coalesce(classic_per_game, 0) >= ?")
+        params.append(min_classic)
+
+    sql = f"SELECT * FROM ({rosters.TRANSFERS_SQL})"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY classic_per_game DESC NULLS LAST LIMIT ?"
+    params.append(limit)
+
+    result = _query(sql, params)
+    result["source"] = "clubs' announced squads, not games played"
+    result["matched_on"] = "team_code, so sponsor renames are not counted as transfers"
     return result
 
 

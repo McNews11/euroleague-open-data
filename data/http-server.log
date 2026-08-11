@@ -33,3 +33,10 @@ INFO:     127.0.0.1:63138 - "POST /mcp HTTP/1.1" 200 OK
 INFO:     127.0.0.1:63139 - "POST /mcp HTTP/1.1" 200 OK
                     INFO     Terminating session: None    streamable_http.py:814
 INFO:     127.0.0.1:63321 - "GET /health HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+[08/11/26 13:00:02] INFO     StreamableHTTP       streamable_http_manager.py:155
+                             session manager                                    
+                             shutting down                                      
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3805]

@@ -24,6 +24,18 @@ def people(comp: str, season: str, *, limit: int = 1000, offset: int = 0) -> str
     )
 
 
+def club_people(comp: str, season: str, club: str) -> str:
+    """A single club's squad for a season.
+
+    Needed because the season-wide `people` route reports `total: 0` for a season that has
+    not started, while this one already returns full squads. Trusting the aggregate would
+    mean reporting "no rosters published" when twenty complete rosters exist -- an absence
+    of data restated as a fact about the world. Returns a bare list, not the usual
+    {"data": [...]} envelope.
+    """
+    return f"{API_LIVE}/v2/competitions/{comp}/seasons/{season}/clubs/{club}/people"
+
+
 def games(comp: str, season: str, *, limit: int = 500, offset: int = 0) -> str:
     return f"{API_LIVE}/v2/competitions/{comp}/seasons/{season}/games?limit={limit}&offset={offset}"
 

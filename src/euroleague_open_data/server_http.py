@@ -27,6 +27,11 @@ from .mcp_server import _con, mcp
 
 log = logging.getLogger(__name__)
 
+# What the checked-in landing page says before a running server rewrites it.
+PLACEHOLDER_SCHEME = "https"
+PLACEHOLDER_HOST = "YOUR-DEPLOYMENT"
+
+
 def _landing_page() -> Path | None:
     """Locate the landing page, which sits outside the package.
 
@@ -55,11 +60,26 @@ def _public_hosts() -> list[str]:
     return [h.strip() for h in raw.split(",") if h.strip()]
 
 
-async def landing(_request: Request) -> Response:
+async def landing(request: Request) -> Response:
+    """The install instructions, with this deployment's own URL filled in.
+
+    The page quotes the endpoint people have to paste into their client, so that URL has
+    to be right. Baking it in at publish time means it is wrong for anyone who forks,
+    moves host, or adds a domain -- and wrong in the quiet way, where the page still
+    renders and the command it shows just does not work. The request knows the hostname,
+    so the substitution happens here instead.
+    """
     page = _landing_page()
-    if page is not None:
-        return HTMLResponse(page.read_text())
-    return HTMLResponse("<h1>euroleague-open-data</h1><p>MCP endpoint at <code>/mcp</code></p>")
+    if page is None:
+        return HTMLResponse("<h1>euroleague-open-data</h1><p>MCP endpoint at <code>/mcp</code></p>")
+
+    host = request.headers.get("host", "")
+    # Behind a proxy the connection is plain HTTP; the client's scheme is the forwarded one.
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    html = page.read_text()
+    if host:
+        html = html.replace(f"{PLACEHOLDER_SCHEME}://{PLACEHOLDER_HOST}", f"{scheme}://{host}")
+    return HTMLResponse(html)
 
 
 async def health(_request: Request) -> Response:
@@ -161,7 +181,7 @@ def main() -> None:
     import uvicorn
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
-    port = int(os.environ.get("PORT", "7860"))  # 7860 is the HuggingFace Spaces default
+    port = int(os.environ.get("PORT", "7860"))  # hosts override this; the image exposes 7860
     host = os.environ.get("BIND_HOST", "0.0.0.0")
 
     public = _public_hosts()

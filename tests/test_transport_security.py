@@ -13,7 +13,7 @@ from mcp.server.transport_security import TransportSecurityMiddleware
 
 from euroleague_open_data.server_http import _security_settings
 
-SPACE = "deividas-euroleague-open-data.hf.space"
+SPACE = "euroleague-open-data.koyeb.app"
 
 
 def _matcher(public: list[str], monkeypatch: pytest.MonkeyPatch) -> TransportSecurityMiddleware:
@@ -51,7 +51,7 @@ def test_own_origin_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_multiple_public_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A Space reachable through a custom domain as well as its hf.space name."""
+    """A deployment reachable through a custom domain as well as its platform name."""
     monkeypatch.setenv("PUBLIC_HOST", f"{SPACE}, euroleague.example.org")
     from euroleague_open_data.server_http import _public_hosts
 

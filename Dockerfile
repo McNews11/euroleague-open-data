@@ -6,7 +6,7 @@
 
 FROM python:3.12-slim
 
-# HuggingFace Spaces runs containers as uid 1000 and will not grant root.
+# Several hosts run containers as a non-root uid and will not grant root.
 RUN useradd -m -u 1000 app
 WORKDIR /app
 

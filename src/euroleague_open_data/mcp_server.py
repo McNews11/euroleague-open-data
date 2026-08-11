@@ -92,6 +92,13 @@ def _con() -> duckdb.DuckDBPyConnection:
                 "`euroleague-etl --season E2025`."
             )
         _connection = duckdb.connect(str(path), read_only=True)
+        # Free hosting tiers are memory-capped, and an OOM kill takes down the whole
+        # container: every other user's request dies so one run_sql could try to hash
+        # 625k play-by-play rows. A budget makes DuckDB spill to disk, or fail that one
+        # query with a real error, instead. Tuned by DUCKDB_MEMORY_LIMIT.
+        limit = os.environ.get("DUCKDB_MEMORY_LIMIT", "256MB")
+        _connection.execute(f"SET memory_limit = '{limit}'")
+        _connection.execute("SET threads = 2")
     return _connection
 
 

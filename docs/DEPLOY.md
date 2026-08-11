@@ -19,68 +19,65 @@ install is enough and costs nothing.
 Say this up front to anyone you invite. A friend on free ChatGPT cannot use this, and that
 is OpenAI's restriction, not ours.
 
-## Host: HuggingFace Spaces
+## Host: Koyeb
 
-Chosen after checking what is actually still free. Fly.io and Railway no longer have free
-tiers; Render's sleeps after 15 minutes of inactivity. HuggingFace Spaces gives 2 vCPU /
-16 GB, unmetered CPU, a public HTTPS URL, and sleeps only after **48 hours** of inactivity.
-Cold start after sleep is 30–90 seconds.
+Picked after the previous choice stopped being free. **HuggingFace Spaces no longer works
+for this**: as of August 2026 Docker and Gradio Spaces require a PRO subscription, and
+only Static Spaces — which cannot run Python — remain free. Fly.io and Railway have no
+free tier either. Render's free tier is real but sleeps after 15 minutes idle.
 
-Ephemeral storage is not a problem here: the warehouse is baked into the image and is only
-ever read.
+Koyeb gives one always-on free service: 0.1 vCPU, 512 MB RAM, no sleep, public HTTPS,
+built from a Dockerfile in a GitHub repo. It may ask for a card if it cannot verify you
+are human; nothing is charged on the free instance.
+
+Treat every claim in this paragraph as perishable. The last host was free when this file
+was first written and was not free a week later.
 
 ### Steps
 
-Steps 1 and 3 need your HuggingFace account, so they are yours. The rest is scripted.
+1. **Sign up** at [koyeb.com](https://app.koyeb.com). "Continue with GitHub" is the
+   shortest path and grants the repo access Koyeb needs to build.
 
-1. **Create the Space.** Sign in at [huggingface.co](https://huggingface.co), then
-   New Space → name `euroleague-open-data` → SDK **Docker** → visibility **Public**.
+2. **Create the service.** Create Web Service → GitHub → `euroleague-open-data`, branch
+   `main`. Koyeb detects the `Dockerfile` on its own.
 
-2. **Build the Space tree.** `scripts/publish_space.sh` generates `build/space` from the
-   current source: it copies what the image needs, bakes the real hostname into the
-   landing page, writes the HF README frontmatter, sets up LFS for the warehouse, and
-   refuses to publish if the warehouse is missing or empty.
+3. **Instance type: Free.** It is not the default. Check before deploying.
 
-   ```bash
-   scripts/publish_space.sh <your-hf-username>/euroleague-open-data
-   ```
+4. **Port 7860.** The container listens there and the healthcheck path is `/health`.
 
-   The Space is a generated artefact rather than a branch, so refreshing it later is a
-   rerun, never a merge conflict.
-
-3. **Push.** Git will ask for your HF username and a token as the password — create one at
-   [Settings → Access Tokens](https://huggingface.co/settings/tokens) with **write**
-   permission.
-
-   ```bash
-   git -C build/space push --force origin main
-   ```
-
-4. **Set `PUBLIC_HOST`.** In the Space's Settings → Variables and secrets, add:
-
-   ```
-   PUBLIC_HOST = <your-hf-username>-euroleague-open-data.hf.space
-   ```
+5. **Set `PUBLIC_HOST`** in the service's environment variables, to the hostname Koyeb
+   assigns (`<service>-<org>.koyeb.app`).
 
    This is not optional, and getting it wrong is hard to diagnose: the server compares the
    `Host` header against an allow-list that starts empty, so every request comes back as a
-   bare `421` that looks exactly like the Space being down. Accepts a comma-separated list
-   if you later add a custom domain.
+   bare `421` that looks exactly like the service being down. Accepts a comma-separated
+   list if you later add a custom domain.
 
    If something still returns 421 in the wild, set `DISABLE_HOST_CHECK=1` to switch host
    validation off without a rebuild. It is a safe fallback here — the protection guards
    servers bound to loopback, and this one is public, read-only and unauthenticated.
 
-5. **Verify from outside.** Once the build finishes:
+6. **Verify from outside.**
 
    ```bash
-   curl https://<your-hf-username>-euroleague-open-data.hf.space/health
+   curl https://<your-service>.koyeb.app/health
    ```
 
    A healthy response lists the loaded seasons. It queries the warehouse rather than just
    returning 200, so a container that started without its data reports unhealthy.
 
-### What has been verified locally
+The landing page does **not** need updating with the deployment URL. It reads the hostname
+off the request and fills itself in, so a fork or a new domain gets correct instructions
+with no edit.
+
+### Memory
+
+The free instance has 512 MB and an OOM kill takes down the container for everyone, not
+just the request that caused it. DuckDB is therefore capped at `DUCKDB_MEMORY_LIMIT`
+(default 256 MB) so a heavy `run_sql` spills to disk or fails alone. Raise it on a larger
+instance.
+
+## What has been verified locally
 
 The image is build-tested, not merely written. Against the running container:
 
@@ -88,44 +85,49 @@ The image is build-tested, not merely written. Against the running container:
 |---|---|
 | `docker build` | succeeds, 915 MB |
 | `/health` | `ok`, 1 123 games across 4 seasons |
-| `/` landing page | serves the real 7 450-byte page, not the fallback stub |
+| `/` landing page | serves the real page with the request's own hostname substituted |
 | MCP handshake | protocol `2025-11-25`, 13 tools, 3 resources |
 | `run_sql` guardrail | refuses `DROP TABLE` over HTTP |
-| Host `…hf.space` | 200 |
 | Host `evil.example.com` | 421 |
 | Docker `HEALTHCHECK` | healthy |
 
-The local build is arm64 and HuggingFace builds amd64 from the same Dockerfile, so the
-build itself is re-run there; what is proven here is the Dockerfile's logic, not its
-portability.
+The local build is arm64 and the host builds amd64 from the same Dockerfile, so the build
+itself is re-run there; what is proven here is the Dockerfile's logic, not its portability.
 
 ## Refreshing the data
 
-The warehouse is a build artefact. To publish new data: crawl, rebuild, verify locally,
-then push.
+The warehouse is committed to the repo because the host builds the image from it. To
+publish new data: crawl, rebuild, verify, push. Koyeb redeploys on push.
 
 ```bash
 uv run euroleague-etl --competition E --season E2026     # crawl one season
 uv run euroleague-etl --skip-crawl                        # rebuild everything from cache
 uv run pytest
-scripts/publish_space.sh <your-hf-username>/euroleague-open-data
-git -C build/space push --force origin main
+git add -f data/euroleague.duckdb
+git commit -m "Refresh warehouse" && git push
 ```
 
 The crawl is slow on purpose — roughly 10 requests per minute, which is what the upstream
 tolerates. A full season takes about two hours. Anything already cached costs nothing.
 
+Committing a 23 MB binary means every refresh adds another blob to history. If that
+becomes a problem, move the file to a GitHub Release and fetch it in the Dockerfile.
+
 ## Local check before deploying
 
 ```bash
-EUROLEAGUE_DB=$PWD/data/euroleague.duckdb uv run euroleague-mcp-http
-curl http://127.0.0.1:7860/health
+docker build -t euroleague-mcp . && docker run --rm -p 7861:7860 \
+  -e PUBLIC_HOST=localhost euroleague-mcp
 ```
 
-Then point a client at `http://127.0.0.1:7860/mcp`.
+```bash
+curl http://127.0.0.1:7861/health
+```
+
+Then point a client at `http://127.0.0.1:7861/mcp`.
 
 ## Cost
 
 Zero, at the time of writing. The only paid element in the whole chain is a ChatGPT
 subscription, which is your friends' side and unrelated to hosting. Free tiers change —
-re-check before assuming.
+this document has already been rewritten once for exactly that reason.

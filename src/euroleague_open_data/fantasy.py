@@ -198,24 +198,38 @@ WITH pool AS (
     FROM fantasy_player_season
     WHERE games_played >= 5
 ),
+-- Everything below is scoped per season. A draft happens inside one season's player
+-- pool, so replacement level and ranks must be computed inside it too. Ranking across
+-- several loaded seasons at once inflates the pool and understates every player's edge
+-- over replacement.
+top_by_season AS (
+    SELECT season_code, pos,
+           row_number() OVER (PARTITION BY season_code ORDER BY {metric} DESC) AS rn
+    FROM pool
+),
 position_share AS (
-    SELECT pos, count(*) * 1.0 / sum(count(*)) OVER () AS share
-    FROM (SELECT pos FROM pool ORDER BY {metric} DESC LIMIT {drafted}) t
-    GROUP BY pos
+    SELECT season_code, pos, count(*) * 1.0 / sum(count(*)) OVER (PARTITION BY season_code)
+             AS share
+    FROM top_by_season
+    WHERE rn <= {drafted}
+    GROUP BY season_code, pos
 ),
 ranked AS (
     SELECT p.*,
-           row_number() OVER (PARTITION BY p.pos ORDER BY p.{metric} DESC) AS pos_rank,
-           row_number() OVER (ORDER BY p.{metric} DESC) AS overall_rank,
+           row_number() OVER (PARTITION BY p.season_code, p.pos
+                              ORDER BY p.{metric} DESC) AS pos_rank,
+           row_number() OVER (PARTITION BY p.season_code
+                              ORDER BY p.{metric} DESC) AS overall_rank,
            greatest(1, cast(round({drafted} * s.share) AS INTEGER)) AS pos_slots
     FROM pool p
-    LEFT JOIN position_share s ON s.pos = p.pos
+    LEFT JOIN position_share s
+      ON s.pos = p.pos AND s.season_code = p.season_code
 ),
 replacement AS (
-    SELECT pos, min({metric}) AS replacement_level
+    SELECT season_code, pos, min({metric}) AS replacement_level
     FROM ranked
     WHERE pos_rank <= pos_slots
-    GROUP BY pos
+    GROUP BY season_code, pos
 )
 SELECT
     r.season_code,
@@ -242,7 +256,7 @@ SELECT
     {teams} AS league_teams,
     {roster_size} AS roster_size
 FROM ranked r
-JOIN replacement rep ON rep.pos = r.pos
+JOIN replacement rep ON rep.pos = r.pos AND rep.season_code = r.season_code
 ORDER BY vorp_per_game DESC
 """
 

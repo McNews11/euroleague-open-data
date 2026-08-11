@@ -1,27 +1,27 @@
 {
-  "generated_at": "2026-08-10T13:03:33+00:00",
+  "generated_at": "2026-08-11T07:38:30+00:00",
   "database": "data/euroleague.duckdb",
   "row_counts": {
-    "boxscores_player": 16101,
-    "boxscores_team": 1354,
-    "coaches": 1354,
-    "coach_rotation_profile": 60,
-    "draft_board": 568,
-    "fantasy_player_season": 629,
-    "fantasy_points_game": 16101,
-    "games": 732,
-    "game_completeness": 732,
-    "players": 459,
-    "player_role_stability": 667,
-    "player_season_stats": 654,
-    "player_team_spells": 709,
-    "play_by_play": 369795,
-    "seasons": 27,
-    "shots": 106745,
-    "shot_zones": 4710,
-    "teams": 38,
-    "team_season_stats": 38,
-    "vacated_role": 52
+    "boxscores_player": 26448,
+    "boxscores_team": 2246,
+    "coaches": 2246,
+    "coach_rotation_profile": 110,
+    "draft_board": 1108,
+    "fantasy_player_season": 1247,
+    "fantasy_points_game": 26448,
+    "games": 1123,
+    "game_completeness": 1123,
+    "players": 950,
+    "player_role_stability": 1320,
+    "player_season_stats": 1301,
+    "player_team_spells": 1414,
+    "play_by_play": 625187,
+    "seasons": 52,
+    "shots": 178177,
+    "shot_zones": 9045,
+    "teams": 78,
+    "team_season_stats": 78,
+    "vacated_role": 90
   },
   "checks": [
     {
@@ -29,7 +29,7 @@
       "description": "boxscores_team.points equals games.home_score/away_score",
       "severity": "error",
       "passed": true,
-      "checked": 1354,
+      "checked": 2246,
       "violations": 0,
       "examples": []
     },
@@ -38,7 +38,7 @@
       "description": "sum(boxscores_player.points) equals boxscores_team.points",
       "severity": "error",
       "passed": true,
-      "checked": 1354,
+      "checked": 2246,
       "violations": 0,
       "examples": []
     },
@@ -47,7 +47,7 @@
       "description": "points implied by play-by-play scoring events equal the boxscore total",
       "severity": "error",
       "passed": true,
-      "checked": 677,
+      "checked": 1123,
       "violations": 0,
       "examples": []
     },
@@ -56,7 +56,7 @@
       "description": "shot rows per team equal boxscore field goals attempted",
       "severity": "warning",
       "passed": false,
-      "checked": 677,
+      "checked": 1123,
       "violations": 1,
       "examples": [
         [
@@ -73,43 +73,43 @@
       "description": "play_number ranges of consecutive periods do not overlap",
       "severity": "warning",
       "passed": false,
-      "checked": 677,
-      "violations": 244,
+      "checked": 1123,
+      "violations": 454,
       "examples": [
         [
           "E2024",
-          1,
+          27,
           2,
-          550,
-          176
+          295,
+          131
         ],
         [
           "E2024",
-          1,
-          3,
-          551,
-          295
-        ],
-        [
-          "E2024",
-          1,
-          4,
-          469,
-          433
-        ],
-        [
-          "E2024",
-          78,
+          57,
           2,
-          276,
-          126
+          461,
+          145
         ],
         [
           "E2024",
-          221,
+          80,
+          2,
+          286,
+          134
+        ],
+        [
+          "E2024",
+          84,
           3,
-          379,
-          264
+          565,
+          292
+        ],
+        [
+          "E2024",
+          144,
+          2,
+          590,
+          161
         ]
       ]
     },
@@ -118,7 +118,7 @@
       "description": "play_number is unique within a game",
       "severity": "warning",
       "passed": true,
-      "checked": 369795,
+      "checked": 625187,
       "violations": 0,
       "examples": []
     },
@@ -127,15 +127,19 @@
       "description": "shots and play-by-play person codes resolve to the players table",
       "severity": "warning",
       "passed": false,
-      "checked": 106745,
-      "violations": 2,
+      "checked": 178177,
+      "violations": 3,
       "examples": [
         [
-          "AC_B",
-          null
+          "014175",
+          "MAJAUSKAS, AURIMAS"
         ],
         [
           "AC_A",
+          null
+        ],
+        [
+          "AC_B",
           null
         ]
       ]
@@ -145,7 +149,7 @@
       "description": "every played game has boxscore, shot and play-by-play rows",
       "severity": "warning",
       "passed": true,
-      "checked": 732,
+      "checked": 1123,
       "violations": 0,
       "examples": []
     }

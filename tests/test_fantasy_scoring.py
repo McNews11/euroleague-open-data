@@ -248,3 +248,75 @@ def test_season_aggregate_excludes_dnp_games(tmp_path):
     con.close()
     assert rows.get("007") == 1
     assert "008" not in rows
+
+
+def test_draft_board_is_scoped_per_season(tmp_path):
+    """A draft happens inside one season's player pool. Ranking across every loaded
+    season at once inflates the pool and understates each player's edge over replacement
+    -- the E2025 leader dropped from 1st to 5th and lost 5.5 points of VORP once EuroCup
+    seasons were loaded alongside."""
+    db = tmp_path / "seasons.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute("""
+        CREATE TABLE fantasy_player_season (
+            season_code VARCHAR, person_code VARCHAR, player_name VARCHAR,
+            team_code VARCHAR, position_name VARCHAR, games_played BIGINT,
+            minutes_per_game DOUBLE, modern_per_game DOUBLE, classic_per_game DOUBLE,
+            modern_total DOUBLE, modern_stddev DOUBLE, modern_floor_p25 DOUBLE,
+            modern_ceiling_p75 DOUBLE, consistency_ratio DOUBLE, double_doubles BIGINT
+        )
+    """)
+    # Season A's players all score higher than season B's. Scoped correctly, each season
+    # has its own rank 1; pooled, season B would have no top-ranked player at all.
+    rows = []
+    for i in range(12):
+        rows.append(
+            (
+                "A",
+                f"a{i}",
+                f"A{i}",
+                "AAA",
+                "Guard",
+                20,
+                25.0,
+                40.0 - i,
+                40.0 - i,
+                0.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                0,
+            )
+        )
+        rows.append(
+            (
+                "B",
+                f"b{i}",
+                f"B{i}",
+                "BBB",
+                "Guard",
+                20,
+                25.0,
+                20.0 - i,
+                20.0 - i,
+                0.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                0,
+            )
+        )
+    con.executemany(
+        "INSERT INTO fantasy_player_season VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows
+    )
+
+    board = con.execute(
+        "SELECT season_code, overall_rank, player_name FROM ("
+        + fantasy.draft_board_select(4, 3, "classic")
+        + ") WHERE overall_rank = 1 ORDER BY season_code"
+    ).fetchall()
+    con.close()
+
+    assert [(r[0], r[2]) for r in board] == [("A", "A0"), ("B", "B0")]

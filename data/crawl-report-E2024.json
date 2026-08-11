@@ -1,0 +1,15 @@
+{
+  "competition": "E",
+  "season": "E2024",
+  "games_in_schedule": 330,
+  "games_crawled": 330,
+  "games_skipped_unplayed": 0,
+  "elapsed_seconds": 4161.8,
+  "fetch": {
+    "requests": 993,
+    "cache_hits": 1,
+    "rate_limit_hits": 0,
+    "sleep_seconds": 3522.8,
+    "errors": {}
+  }
+}

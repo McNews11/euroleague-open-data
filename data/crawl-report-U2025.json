@@ -1,0 +1,15 @@
+{
+  "competition": "U",
+  "season": "U2025",
+  "games_in_schedule": 195,
+  "games_crawled": 195,
+  "games_skipped_unplayed": 0,
+  "elapsed_seconds": 2539.7,
+  "fetch": {
+    "requests": 589,
+    "cache_hits": 0,
+    "rate_limit_hits": 0,
+    "sleep_seconds": 2158.1,
+    "errors": {}
+  }
+}

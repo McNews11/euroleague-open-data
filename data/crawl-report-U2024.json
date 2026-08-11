@@ -1,0 +1,18 @@
+{
+  "competition": "U",
+  "season": "U2024",
+  "games_in_schedule": 196,
+  "games_crawled": 196,
+  "games_skipped_unplayed": 0,
+  "elapsed_seconds": 62616.0,
+  "fetch": {
+    "requests": 602,
+    "cache_hits": 1,
+    "rate_limit_hits": 0,
+    "sleep_seconds": 2170.5,
+    "errors": {
+      "RemoteProtocolError": 6,
+      "ReadTimeout": 5
+    }
+  }
+}
